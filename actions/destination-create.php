@@ -2,6 +2,15 @@
 $required_params = array("domain_uuid", "number", "extension");
 
 function do_action($body) {
+    // number is used in dialplan regular expressions, so digits only (a "."
+    // would otherwise match every inbound call)
+    if(!(is_string($body->number) || is_int($body->number)) || !ctype_digit((string)$body->number)) {
+        return array("error" => "invalid number", "code" => 400);
+    }
+    if(!is_dial_number($body->extension)) {
+        return array("error" => "invalid extension", "code" => 400);
+    }
+
     $sql = "SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid";
     $parameters['domain_uuid'] = $body->domain_uuid;
     $database = new database;

@@ -1,5 +1,5 @@
 <?php
-$required_params = array("domain_uuid", "extension");
+$required_params = array("domain_uuid", "extension_uuid");
 
 function do_action($body) {
     $fields = array(
@@ -63,13 +63,13 @@ function do_action($body) {
     );
 
     $sql = "SELECT v_extensions.".implode(", v_extensions.", $fields);
-    $sql .= " FROM v_extensions WHERE domain_uuid = :domain_uuid AND extension_uuid = :extension";
-    $parameters['domain'] = $body->domain;
-    $parameters['extension'] = $body->extension;
+    $sql .= " FROM v_extensions WHERE domain_uuid = :domain_uuid AND extension_uuid = :extension_uuid";
+    $parameters['domain_uuid'] = $body->domain_uuid;
+    $parameters['extension_uuid'] = $body->extension_uuid;
     $database = new database;
     $extension = $database->select($sql, $parameters, 'row');
     if(!$extension) {
         return array("error" => "extension not found", "code" => 404);
     }
-    echo $extension;
+    return $extension;
 }

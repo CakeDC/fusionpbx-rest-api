@@ -2,6 +2,12 @@
 $required_params = array("domain_uuid", "caller_id_number", "destination_a", "destination_b");
 
 function do_action($body) {
+  foreach(array("caller_id_number", "destination_a", "destination_b") as $field) {
+    if(!is_dial_number($body->{$field})) {
+      return array("error" => "invalid ".$field, "code" => 400);
+    }
+  }
+
   $sql = "SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid";
   $parameters['domain_uuid'] = $body->domain_uuid;
   $database = new database;
@@ -17,7 +23,7 @@ function do_action($body) {
   }
 
   $cid_name = "";
-  if($body->caller_id_name) {
+  if(!empty($body->caller_id_name) && is_string($body->caller_id_name)) {
     $cid_name = ",effective_caller_id_name=".rawurlencode($body->caller_id_name);
   }
   $leg_prefix = "{ignore_early_media=true,originate_timeout=30,effective_caller_id_number=".$body->caller_id_number.$cid_name."}loopback/";

@@ -15,13 +15,23 @@ if(!permission_exists('rest_api_manage_keys')) {
     die();
 }
 
-if($_POST['action'] == "delete" && $_POST['key_uuid']) {
+$object = new token;
+
+if(($_POST['action'] ?? '') == "delete" && is_uuid($_POST['key_uuid'] ?? '')) {
+	if(!$object->validate('rest_api_keys')) {
+		message::add("invalid token", 'negative');
+		header('Location: index.php');
+		exit;
+	}
+
 	$sql = "DELETE FROM rest_api_keys WHERE key_uuid = :key_uuid";
 	$parameters['key_uuid'] = $_POST['key_uuid'];
 	$database = new database;
-	$keys = $database->select($sql, $parameters, 'all');
+	$database->execute($sql, $parameters);
 	unset($parameters);
 }
+
+$token = $object->create('rest_api_keys');
 
 echo "<form method='post'>";
 echo modal::create([
@@ -40,6 +50,7 @@ echo modal::create([
 	]
 )]);
 echo "<input type='hidden' name='key_uuid' id='key_uuid'/>";
+echo "<input type='hidden' name='".$token['name']."' value='".$token['hash']."'>";
 echo "</form>";
 
 echo "<div class='action_bar' id='action_bar'>\n";
@@ -50,7 +61,7 @@ echo "	</div>\n";
 echo "	<div style='clear: both;'></div>\n";
 echo "</div>\n";
 echo "<br /><br />\n";
-echo "endpoint: <code>https://".$_SERVER['HTTP_HOST']."/app/rest_api/rest.php</code>\n";
+echo "endpoint: <code>https://".escape($_SERVER['HTTP_HOST'])."/app/rest_api/rest.php</code>\n";
 
 $sql = "select key_uuid, name, created, last_used from rest_api_keys ORDER BY last_used DESC";
 $database = new database;
@@ -69,12 +80,12 @@ unset($parameters);
 foreach($keys as $key) {
 ?>
 <tr>
-	<td><a href="key_edit.php?key_uuid=<?php echo $key['key_uuid']; ?>"><?php echo $key['name']; ?></a></td>
-	<td><a href="key_edit.php?key_uuid=<?php echo $key['key_uuid']; ?>"><code><?php echo $key['key_uuid']; ?></code></a></td>
-	<td><?php echo $key['created']; ?></td>
-	<td><?php echo $key['last_used']; ?></td>
+	<td><a href="key_edit.php?key_uuid=<?php echo escape($key['key_uuid']); ?>"><?php echo escape($key['name']); ?></a></td>
+	<td><a href="key_edit.php?key_uuid=<?php echo escape($key['key_uuid']); ?>"><code><?php echo escape($key['key_uuid']); ?></code></a></td>
+	<td><?php echo escape($key['created']); ?></td>
+	<td><?php echo escape($key['last_used']); ?></td>
 	<td class="middle button"><?php
-		echo button::create(['type'=>'button','icon'=>$_SESSION['theme']['button_icon_delete'],'onclick'=>"document.querySelector('#key_uuid').value = '".$key['key_uuid']."'; modal_open('modal-delete','btn_delete');"]);
+		echo button::create(['type'=>'button','icon'=>$_SESSION['theme']['button_icon_delete'],'onclick'=>"document.querySelector('#key_uuid').value = '".escape($key['key_uuid'])."'; modal_open('modal-delete','btn_delete');"]);
 	?></td>
 </tr>
 <?php

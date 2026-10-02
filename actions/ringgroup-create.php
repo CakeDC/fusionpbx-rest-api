@@ -2,6 +2,16 @@
 $required_params = array("domain_uuid", "name", "extension", "destinations", "strategy");
 
 function do_action($body) {
+    if(!is_string($body->name)) {
+        return array("error" => "invalid name", "code" => 400);
+    }
+    if(!is_dial_number($body->extension)) {
+        return array("error" => "invalid extension", "code" => 400);
+    }
+    if(!in_array($body->strategy, array("simultaneous", "sequence", "enterprise", "rollover", "random"), true)) {
+        return array("error" => "invalid strategy", "code" => 400);
+    }
+
     $sql = "SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid";
     $parameters['domain_uuid'] = $body->domain_uuid;
     $database = new database;
@@ -24,12 +34,15 @@ function do_action($body) {
     $dialplan_uuid = uuid();
 
     $ring_group_destinations = array();
-    $requested_destinations = json_decode($body->destinations);
-    if(sizeof($requested_destinations) == 0) {
-        return_error("no destinations specified. Value must be a JSON array");
+    $requested_destinations = is_string($body->destinations) ? json_decode($body->destinations) : null;
+    if(!is_array($requested_destinations) || sizeof($requested_destinations) == 0) {
+        return array("error" => "no destinations specified. Value must be a JSON array", "code" => 400);
     }
 
     foreach($requested_destinations as $destination) {
+        if(!is_object($destination) || !is_dial_number($destination->number ?? null)) {
+            return array("error" => "invalid destination number", "code" => 400);
+        }
         $ring_group_destinations[] = array(
             "ring_group_uuid" => $ring_group_uuid,
             "ring_group_destination_uuid" => uuid(),
@@ -70,8 +83,8 @@ function do_action($body) {
         "ring_group_destinations" => $ring_group_destinations
     );
 
-    $dialplan_xml = "<extension name=\"".$body->name."\" continue=\"\" uuid=\"".$dialplan_uuid."\">\n";
-    $dialplan_xml .= "\t<condition field=\"destination_number\" expression=\"^".$body->extension."$\">\n";
+    $dialplan_xml = "<extension name=\"".htmlspecialchars($body->name, ENT_QUOTES | ENT_XML1)."\" continue=\"\" uuid=\"".$dialplan_uuid."\">\n";
+    $dialplan_xml .= "\t<condition field=\"destination_number\" expression=\"^".preg_quote((string)$body->extension)."$\">\n";
     $dialplan_xml .= "\t\t<action application=\"ring_ready\" data=\"\" />\n";
     $dialplan_xml .= "\t\t<action application=\"set\" data=\"ring_group_uuid=".$ring_group_uuid."\" />\n";
     $dialplan_xml .= "\t\t<action application=\"lua\" data=\"app.lua ring_groups\" />\n";
