@@ -1,6 +1,6 @@
 <?php
 function parse_fs($command) {
-  $fp = event_socket_create($_SESSION['event_socket_ip_address'], $_SESSION['event_socket_port'], $_SESSION['event_socket_password']);
+  $fp = event_socket_create($_SESSION['event_socket_ip_address'] ?? null, $_SESSION['event_socket_port'] ?? null, $_SESSION['event_socket_password'] ?? null);
   if (!$fp) {
     return array("error" => "Failed to connect to event socket");
   }

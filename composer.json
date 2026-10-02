@@ -1,0 +1,33 @@
+{
+    "name": "cakedc/fusionpbx-rest-api",
+    "description": "FusionPBX REST API app",
+    "type": "project",
+    "license": "GPL-3.0-only",
+    "require-dev": {
+        "phpunit/phpcov": "^11.0",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RestApi\\Test\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "coverage": [
+            "rm -rf build/coverage && mkdir -p build/coverage/raw",
+            "@putenv COVERAGE_DIR=build/coverage/raw",
+            "@putenv XDEBUG_MODE=coverage",
+            "phpunit --coverage-php build/coverage/raw/unit.cov",
+            "phpcov merge --html build/coverage/html --text php://stdout build/coverage/raw"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "process-timeout": 0
+    },
+    "scripts-descriptions": {
+        "test": "Run the test suite",
+        "coverage": "Run the tests with code coverage (needs Xdebug) and write an HTML report to build/coverage/html"
+    }
+}

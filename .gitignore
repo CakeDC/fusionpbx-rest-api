@@ -1,1 +1,4 @@
 settings.json
+/vendor/
+/.phpunit.cache/
+/build/

@@ -17,7 +17,7 @@ function do_action($body) {
       return array("error" => "domain not found", "code" => 404);
   }
 
-  $fp = event_socket_create($_SESSION['event_socket_ip_address'], $_SESSION['event_socket_port'], $_SESSION['event_socket_password']);
+  $fp = event_socket_create($_SESSION['event_socket_ip_address'] ?? null, $_SESSION['event_socket_port'] ?? null, $_SESSION['event_socket_password'] ?? null);
   if (!$fp) {
     return array("error" => "internal_server_error", "message" => "failed to connect to FreeSWITCH");
   }
