@@ -17,7 +17,7 @@ abstract class RestApiTestCase extends HttpTestCase
 	protected const ACTION_PERMISSIONS = array(
 		'extension_add', 'voicemail_add', 'destination_add', 'dialplan_add', 'dialplan_detail_add',
 		'ring_group_add', 'ring_group_destination_add', 'extension_view', 'destination_view',
-		'xml_cdr_view', 'click_to_call_call',
+		'xml_cdr_view', 'click_to_call_call', 'user_view',
 	);
 
 	protected function tables(): array

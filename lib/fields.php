@@ -62,6 +62,18 @@ const REST_API_EXTENSION_FIELDS = array(
     "update_user"
 );
 
+// extension-user-list: the Extension of the ZuluCall contract (#43936)
+const REST_API_USER_EXTENSION_FIELDS = array(
+    "extension_uuid",
+    "extension",
+    "domain_uuid",
+    "directory_first_name",
+    "directory_last_name",
+    "emergency_caller_id_number",
+    "outbound_caller_id_number",
+    "enabled"
+);
+
 const REST_API_DESTINATION_FIELDS = array(
     "destination_uuid",
     "domain_uuid",
