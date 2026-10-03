@@ -1,5 +1,5 @@
 <?php
-$required_params = array("domain_uuid", "extension_uuid");
+$required_params = array("extension_uuid");
 $required_permissions = array("extension_view");
 
 function do_action($body) {

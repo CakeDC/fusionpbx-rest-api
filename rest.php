@@ -121,6 +121,11 @@ if(!is_array($required_permissions)) {
 	return_error("action does not declare permissions", 500);
 }
 
+$context = rest_api_resolve_domain($body, $key);
+if(isset($context['error'])) {
+	return_error($context['error'], $context['code']);
+}
+
 // checked before the parameters, so callers without access don't learn what an action expects
 $missing_permissions = rest_api_missing_permissions($required_permissions);
 if($missing_permissions) {
@@ -135,7 +140,8 @@ if($validation_errors) {
 }
 
 if(function_exists('do_action')) {
-	$resp = do_action($body);
+	// actions declared as do_action($body) just ignore the context
+	$resp = do_action($body, $context);
 	if(!empty($resp['code'])) {
 		http_response_code($resp['code']);
 		unset($resp['code']);

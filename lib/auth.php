@@ -86,3 +86,37 @@ function rest_api_missing_permissions(array $required) {
 	}
 	return $missing;
 }
+
+/**
+ * Picks the domain the request acts on and checks the user may act on it.
+ * Sets $body->domain_uuid, to the user's own domain when the request has none.
+ * Returns the context passed to do_action(), or array("error" => ..., "code" => ...).
+ */
+function rest_api_resolve_domain($body, array $key) {
+	$context = array(
+		'domain_explicit' => !empty($body->domain_uuid),
+		'cross_domain' => permission_exists('domain_select'),
+		'user_domain_uuid' => $key['domain_uuid'],
+	);
+	if(!$context['domain_explicit']) {
+		$body->domain_uuid = $key['domain_uuid'];
+		return $context;
+	}
+	if(!is_uuid($body->domain_uuid)) {
+		return array("error" => "invalid domain_uuid", "code" => 400);
+	}
+	$body->domain_uuid = strtolower($body->domain_uuid);
+	if($body->domain_uuid === strtolower($key['domain_uuid'])) {
+		return $context;
+	}
+	// before looking the domain up, so the answer doesn't reveal whether it exists
+	if(!$context['cross_domain']) {
+		return array("error" => "forbidden", "code" => 403);
+	}
+	$sql = "SELECT domain_enabled FROM v_domains WHERE domain_uuid = :domain_uuid";
+	$enabled = database::new()->select($sql, array('domain_uuid' => $body->domain_uuid), 'column');
+	if(!rest_api_is_true($enabled)) {
+		return array("error" => "domain not found", "code" => 404);
+	}
+	return $context;
+}

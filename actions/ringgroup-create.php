@@ -1,5 +1,5 @@
 <?php
-$required_params = array("domain_uuid", "name", "extension", "destinations", "strategy");
+$required_params = array("name", "extension", "destinations", "strategy");
 $required_permissions = array("ring_group_add", "ring_group_destination_add", "dialplan_add");
 
 function do_action($body) {

@@ -10,6 +10,8 @@ use PHPUnit\Framework\TestCase;
  */
 abstract class ActionTestCase extends TestCase
 {
+	protected const DOMAIN_UUID = 'aaaaaaaa-0000-4000-8000-000000000001';
+
 	/** Action file name without extension, e.g. "originate". */
 	abstract protected function action(): string;
 
@@ -47,9 +49,14 @@ abstract class ActionTestCase extends TestCase
 		);
 	}
 
-	protected function runAction(array $body)
+	/** Run the action as rest.php does, with the context from rest_api_resolve_domain(). */
+	protected function runAction(array $body, array $context = array())
 	{
-		return do_action((object)$body);
+		return do_action((object)$body, $context + array(
+			'domain_explicit' => true,
+			'cross_domain' => false,
+			'user_domain_uuid' => self::DOMAIN_UUID,
+		));
 	}
 
 	/** Make the next database save() fail, as FusionPBX's does on a database error. */

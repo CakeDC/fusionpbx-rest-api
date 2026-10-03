@@ -1,5 +1,5 @@
 <?php
-$required_params = array("domain_uuid", "number", "extension");
+$required_params = array("number", "extension");
 $required_permissions = array("destination_add", "dialplan_add", "dialplan_detail_add");
 
 function do_action($body) {

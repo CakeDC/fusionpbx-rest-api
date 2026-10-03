@@ -1,5 +1,5 @@
 <?php
-$required_params = array("domain_uuid", "extension");
+$required_params = array("extension");
 $required_permissions = array("extension_add", "voicemail_add");
 function do_action($body) {    
     $caller_id_name = "";

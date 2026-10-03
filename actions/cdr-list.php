@@ -1,5 +1,5 @@
 <?php
-$required_params = array("domain_uuid");
+$required_params = array();
 $required_permissions = array("xml_cdr_view");
 
 function do_action($body) {
