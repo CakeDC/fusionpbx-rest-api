@@ -28,6 +28,7 @@ class FakeStore {
 			'esl_response' => "+OK 7f4de3d2-0000-4000-8000-00000000c411\n",
 			'esl_available' => true,
 			'save_fails' => false,
+			'select_fails' => false,
 			'uuid_counter' => 0,
 		));
 	}
@@ -88,21 +89,12 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 		throw new RuntimeException("unsupported SQL value: ".$expression);
 	};
 
-	$where = function ($clause) use ($value) {
-		$conditions = array();
-		foreach (preg_split('/ and /i', $clause) as $condition) {
-			if (!preg_match('/^([\w.]+) = (.+)$/', trim($condition), $m)) {
-				throw new RuntimeException("unsupported SQL condition: ".$condition);
-			}
-			$conditions[$m[1]] = $value($m[2]);
-		}
-		return function ($row) use ($conditions) {
-			foreach ($conditions as $column => $expected) {
-				if (!isset($row[$column]) || (string)$row[$column] !== (string)$expected) {
-					return false;
-				}
-			}
-			return true;
+	// a WHERE clause as a row filter. $aliases are the names the row's columns
+	// can be qualified with; $tables feed EXISTS subqueries
+	$where = function ($clause, array $tables, array $aliases) use ($parameters) {
+		$condition = FakeSqlCondition::parse($clause, $parameters, $tables);
+		return function ($row) use ($condition, $aliases) {
+			return $condition(array(array('aliases' => $aliases, 'row' => $row))) === true;
 		};
 	};
 
@@ -114,6 +106,7 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 			throw new RuntimeException("unsupported SQL from: ".$clause);
 		}
 		$alias = !empty($m[2]) ? $m[2] : $m[1];
+		$aliases = array($alias);
 		$rows = array();
 		foreach ($tables[$m[1]] ?? array() as $row) {
 			foreach ($row as $column => $v) {
@@ -124,6 +117,7 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 		preg_match_all('/ left join (\w+) (\w+) on (\w+\.\w+) = (\w+\.\w+)/i', $m[3] ?? '', $joins, PREG_SET_ORDER);
 		foreach ($joins as $join) {
 			list(, $table, $join_alias, $left, $right) = $join;
+			$aliases[] = $join_alias;
 			if (strpos($left, $join_alias.'.') !== 0) {
 				list($left, $right) = array($right, $left);
 			}
@@ -139,16 +133,20 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 				}
 			}
 		}
-		return $rows;
+		return array($rows, $aliases);
 	};
 
 	return FakeStore::update(function (&$state) use ($sql, $parameters, $return_type, $value, $where, $from) {
 		$state['queries'][] = array('sql' => $sql, 'parameters' => $parameters);
 
-		if (preg_match('/^select (.+?) from (.+?)(?: where (.+?))?(?: order by (.+?))?(?: limit (\d+))?$/i', $sql, $m)) {
-			$rows = $from($m[2], $state['tables']);
+		if (preg_match('/^select (.+?) from (.+?)(?: where (.+?))?(?: order by (.+?))?(?: limit (\d+))?(?: offset (\d+))?$/i', $sql, $m)) {
+			list($rows, $aliases) = $from($m[2], $state['tables']);
 			if (!empty($m[3])) {
-				$rows = array_values(array_filter($rows, $where($m[3])));
+				$rows = array_values(array_filter($rows, $where($m[3], $state['tables'], $aliases)));
+			}
+			if (preg_match('/^count\(\*\)$/i', trim($m[1]))) {
+				$rows = array(array('count' => count($rows)));
+				$m[1] = 'count';
 			}
 			if (!empty($m[4])) {
 				$order = array();
@@ -168,8 +166,8 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 					return 0;
 				});
 			}
-			if (!empty($m[5])) {
-				$rows = array_slice($rows, 0, (int)$m[5]);
+			if (!empty($m[5]) || !empty($m[6])) {
+				$rows = array_slice($rows, (int)($m[6] ?? 0), !empty($m[5]) ? (int)$m[5] : null);
 			}
 			if (trim($m[1]) === '*') {
 				$rows = array_map(function ($row) {
@@ -203,7 +201,7 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 		}
 
 		if (preg_match('/^update (\w+) set (.+?) where (.+)$/i', $sql, $m)) {
-			$matches_row = $where($m[3]);
+			$matches_row = $where($m[3], $state['tables'], array($m[1]));
 			$assignments = array();
 			foreach (explode(',', $m[2]) as $assignment) {
 				list($column, $expression) = array_map('trim', explode('=', $assignment, 2));
@@ -218,7 +216,7 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 		}
 
 		if (preg_match('/^delete from (\w+) where (.+)$/i', $sql, $m)) {
-			$matches_row = $where($m[2]);
+			$matches_row = $where($m[2], $state['tables'], array($m[1]));
 			$state['tables'][$m[1]] = array_values(array_filter($state['tables'][$m[1]] ?? array(), function ($row) use ($matches_row) {
 				return !$matches_row($row);
 			}));
@@ -227,6 +225,369 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 
 		throw new RuntimeException("unsupported SQL: ".$sql);
 	});
+}
+
+/**
+ * WHERE clauses for fake_sql(), with Postgres semantics for what the plugin uses:
+ * AND, OR, NOT, parentheses, = <> != < <= > >=, IS [NOT] NULL, [NOT] IN (...),
+ * [NOT] IN (SELECT expression FROM table alias WHERE ...), [NOT] LIKE ...
+ * [ESCAPE ...], CAST(... AS type) and correlated [NOT] EXISTS (SELECT 1 FROM
+ * table alias WHERE ...). Like SQL it has three-valued logic: a comparison with NULL
+ * is unknown (null), and a row only matches when the condition is true.
+ */
+class FakeSqlCondition {
+	private $tokens;
+	private $pos = 0;
+	private $parameters;
+	private $tables;
+
+	private function __construct(array $tokens, array $parameters, array $tables) {
+		$this->tokens = $tokens;
+		$this->parameters = $parameters;
+		$this->tables = $tables;
+	}
+
+	/**
+	 * Returns function (array $scopes): ?bool. $scopes are the rows in reach,
+	 * innermost last, each array('aliases' => [...], 'row' => [...]).
+	 */
+	public static function parse(string $clause, array $parameters, array $tables): callable {
+		$tokens = array();
+		$offset = 0;
+		while ($offset < strlen($clause)) {
+			if (!preg_match("/\\s*('(?:[^']|'')*'|:\\w+|\\d+|now\\(\\)|[\\w.]+|<>|!=|<=|>=|[=<>(),])\\s*/Ai", $clause, $m, 0, $offset)) {
+				throw new RuntimeException("unsupported SQL condition: ".$clause);
+			}
+			$tokens[] = $m[1];
+			$offset += strlen($m[0]);
+		}
+		$parser = new self($tokens, $parameters, $tables);
+		$condition = $parser->disjunction();
+		if ($parser->pos !== count($tokens)) {
+			throw new RuntimeException("unsupported SQL condition: ".$clause);
+		}
+		return $condition;
+	}
+
+	private function peek(): ?string {
+		return $this->tokens[$this->pos] ?? null;
+	}
+
+	private function accept(string $token): bool {
+		if ($this->peek() !== null && strcasecmp($this->peek(), $token) === 0) {
+			$this->pos++;
+			return true;
+		}
+		return false;
+	}
+
+	private function expect(string $token): void {
+		if (!$this->accept($token)) {
+			throw new RuntimeException("unsupported SQL condition: expected ".$token." at ".implode(' ', array_slice($this->tokens, $this->pos)));
+		}
+	}
+
+	private function disjunction(): callable {
+		$parts = array($this->conjunction());
+		while ($this->accept('or')) {
+			$parts[] = $this->conjunction();
+		}
+		return function (array $scopes) use ($parts) {
+			$result = false;
+			foreach ($parts as $part) {
+				$value = $part($scopes);
+				if ($value === true) {
+					return true;
+				}
+				if ($value === null) {
+					$result = null;
+				}
+			}
+			return $result;
+		};
+	}
+
+	private function conjunction(): callable {
+		$parts = array($this->negation());
+		while ($this->accept('and')) {
+			$parts[] = $this->negation();
+		}
+		return function (array $scopes) use ($parts) {
+			$result = true;
+			foreach ($parts as $part) {
+				$value = $part($scopes);
+				if ($value === false) {
+					return false;
+				}
+				if ($value === null) {
+					$result = null;
+				}
+			}
+			return $result;
+		};
+	}
+
+	private function negation(): callable {
+		if ($this->accept('not')) {
+			$inner = $this->negation();
+			return function (array $scopes) use ($inner) {
+				$value = $inner($scopes);
+				return $value === null ? null : !$value;
+			};
+		}
+		if ($this->accept('exists')) {
+			$this->expect('(');
+			$subquery = $this->subquery();
+			$this->expect(')');
+			return $subquery;
+		}
+		if ($this->peek() === '(') {
+			$this->pos++;
+			$inner = $this->disjunction();
+			$this->expect(')');
+			return $inner;
+		}
+		return $this->comparison();
+	}
+
+	// SELECT 1 FROM table [alias] WHERE condition: true when any row matches
+	private function subquery(): callable {
+		$this->expect('select');
+		$this->expect('1');
+		$this->expect('from');
+		$table = $this->tokens[$this->pos++] ?? '';
+		$alias = $table;
+		if ($this->peek() !== null && strcasecmp($this->peek(), 'where') !== 0) {
+			$alias = $this->tokens[$this->pos++];
+		}
+		$this->expect('where');
+		$condition = $this->disjunction();
+		$tables = $this->tables;
+		return function (array $scopes) use ($table, $alias, $condition, $tables) {
+			foreach ($tables[$table] ?? array() as $row) {
+				foreach ($row as $column => $value) {
+					$row[$alias.'.'.$column] = $value;
+				}
+				if ($condition(array_merge($scopes, array(array('aliases' => array($alias), 'row' => $row)))) === true) {
+					return true;
+				}
+			}
+			return false;
+		};
+	}
+
+	// SELECT expression FROM table [alias] [WHERE condition] inside IN (...):
+	// the values of the expression for the matching rows
+	private function listSubquery(?string $left_type): callable {
+		$this->expect('select');
+		list($expression, $type) = $this->operand();
+		if ($left_type !== null && $type !== null && $left_type !== $type) {
+			throw new RuntimeException("operator does not exist: ".$left_type." = ".$type);
+		}
+		$this->expect('from');
+		$table = $this->tokens[$this->pos++] ?? '';
+		$alias = $table;
+		if ($this->peek() !== null && $this->peek() !== ')' && strcasecmp($this->peek(), 'where') !== 0) {
+			$alias = $this->tokens[$this->pos++];
+		}
+		$condition = $this->accept('where') ? $this->disjunction() : null;
+		$tables = $this->tables;
+		return function (array $scopes) use ($table, $alias, $expression, $condition, $tables) {
+			$values = array();
+			foreach ($tables[$table] ?? array() as $row) {
+				foreach ($row as $column => $value) {
+					$row[$alias.'.'.$column] = $value;
+				}
+				$inner = array_merge($scopes, array(array('aliases' => array($alias), 'row' => $row)));
+				if ($condition === null || $condition($inner) === true) {
+					$values[] = $expression($inner);
+				}
+			}
+			return $values;
+		};
+	}
+
+	private function comparison(): callable {
+		list($left, $left_type) = $this->operand();
+		if ($this->accept('is')) {
+			$not = $this->accept('not');
+			$this->expect('null');
+			return function (array $scopes) use ($left, $not) {
+				return ($left($scopes) === null) !== $not;
+			};
+		}
+		$not = $this->accept('not');
+		if ($this->accept('in')) {
+			$this->expect('(');
+			if ($this->peek() !== null && strcasecmp($this->peek(), 'select') === 0) {
+				$candidates = $this->listSubquery($left_type);
+			} else {
+				$list = array($this->operand()[0]);
+				while ($this->accept(',')) {
+					$list[] = $this->operand()[0];
+				}
+				$candidates = function (array $scopes) use ($list) {
+					return array_map(function ($item) use ($scopes) { return $item($scopes); }, $list);
+				};
+			}
+			$this->expect(')');
+			// like SQL: no match against a set holding NULL is unknown
+			return function (array $scopes) use ($left, $candidates, $not) {
+				$value = $left($scopes);
+				if ($value === null) {
+					return null;
+				}
+				$unknown = false;
+				foreach ($candidates($scopes) as $candidate) {
+					if ($candidate === null) {
+						$unknown = true;
+					} elseif (fake_sql_compare($value, $candidate) === 0) {
+						return !$not;
+					}
+				}
+				return $unknown ? null : $not;
+			};
+		}
+		if ($this->accept('like')) {
+			$pattern = $this->operand()[0];
+			$escape = $this->accept('escape') ? $this->operand()[0] : null;
+			return function (array $scopes) use ($left, $pattern, $escape, $not) {
+				$value = $left($scopes);
+				$like = $pattern($scopes);
+				if ($value === null || $like === null) {
+					return null;
+				}
+				return fake_sql_like((string)$value, (string)$like, $escape ? (string)$escape($scopes) : '\\') !== $not;
+			};
+		}
+		$operator = $this->tokens[$this->pos++] ?? '';
+		if ($not || !in_array($operator, array('=', '<>', '!=', '<', '<=', '>', '>='), true)) {
+			throw new RuntimeException("unsupported SQL operator: ".$operator);
+		}
+		list($right, $right_type) = $this->operand();
+		if ($left_type !== null && $right_type !== null && $left_type !== $right_type) {
+			throw new RuntimeException("operator does not exist: ".$left_type." ".$operator." ".$right_type);
+		}
+		return function (array $scopes) use ($left, $right, $operator) {
+			$a = $left($scopes);
+			$b = $right($scopes);
+			if ($a === null || $b === null) {
+				return null;
+			}
+			$cmp = fake_sql_compare($a, $b);
+			switch ($operator) {
+				case '=': return $cmp === 0;
+				case '<>':
+				case '!=': return $cmp !== 0;
+				case '<': return $cmp < 0;
+				case '<=': return $cmp <= 0;
+				case '>': return $cmp > 0;
+				default: return $cmp >= 0;
+			}
+		};
+	}
+
+	// array(function (array $scopes) returning the value, Postgres type or null
+	// when the type comes from the context: placeholders and literals)
+	private function operand(): array {
+		$token = $this->tokens[$this->pos++] ?? null;
+		if ($token === null || in_array(strtolower($token), array('and', 'or', 'not', 'is', 'in', 'like', '(', ')', ','), true)) {
+			throw new RuntimeException("unsupported SQL value: ".$token);
+		}
+		if (strcasecmp($token, 'cast') === 0) {
+			$this->expect('(');
+			$inner = $this->operand()[0];
+			$this->expect('as');
+			$type = strtolower($this->tokens[$this->pos++] ?? '');
+			$this->expect(')');
+			return array(function (array $scopes) use ($inner) {
+				$value = $inner($scopes);
+				return $value === null ? null : (string)$value;
+			}, $type);
+		}
+		if ($token[0] === ':') {
+			$value = $this->parameters[substr($token, 1)];
+			return array(function () use ($value) { return $value; }, null);
+		}
+		if ($token[0] === "'") {
+			$value = str_replace("''", "'", substr($token, 1, -1));
+			return array(function () use ($value) { return $value; }, null);
+		}
+		if (ctype_digit($token)) {
+			return array(function () use ($token) { return $token; }, null);
+		}
+		if (strcasecmp($token, 'now()') === 0) {
+			return array(function () { return '2026-10-02 12:00:00+00'; }, null);
+		}
+		if (strcasecmp($token, 'true') === 0 || strcasecmp($token, 'false') === 0) {
+			$value = strtolower($token);
+			return array(function () use ($value) { return $value; }, null);
+		}
+		if (strcasecmp($token, 'null') === 0) {
+			return array(function () { return null; }, null);
+		}
+		$column = preg_replace('/^\w+\./', '', $token);
+		return array(function (array $scopes) use ($token) {
+			return fake_sql_column($token, $scopes);
+		}, FAKE_SQL_COLUMN_TYPES[$column] ?? null);
+	}
+}
+
+// FusionPBX 5.6.5 column types where uuid and text columns meet
+// (v_xml_cdr.bridge_uuid is text). Postgres has no text = uuid operator
+const FAKE_SQL_COLUMN_TYPES = array(
+	'xml_cdr_uuid' => 'uuid',
+	'domain_uuid' => 'uuid',
+	'extension_uuid' => 'uuid',
+	'originating_leg_uuid' => 'uuid',
+	'call_center_queue_uuid' => 'uuid',
+	'bridge_uuid' => 'text',
+);
+
+// a column of the innermost row, or of the row whose alias qualifies it.
+// a column the row doesn't have is NULL
+function fake_sql_column(string $name, array $scopes) {
+	if (strpos($name, '.') === false) {
+		return end($scopes)['row'][$name] ?? null;
+	}
+	$alias = substr($name, 0, strpos($name, '.'));
+	for ($i = count($scopes) - 1; $i >= 0; $i--) {
+		if (in_array($alias, $scopes[$i]['aliases'], true)) {
+			return $scopes[$i]['row'][$name] ?? null;
+		}
+	}
+	throw new RuntimeException("unknown SQL alias: ".$name);
+}
+
+// compares like Postgres would for the stored types: timestamps as instants,
+// booleans as true/false, everything else as text
+function fake_sql_compare($a, $b): int {
+	$a = is_bool($a) ? ($a ? 'true' : 'false') : (string)$a;
+	$b = is_bool($b) ? ($b ? 'true' : 'false') : (string)$b;
+	$timestamp = '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/';
+	if (preg_match($timestamp, $a) && preg_match($timestamp, $b)) {
+		$utc = new DateTimeZone('UTC');
+		return (new DateTimeImmutable($a, $utc)) <=> (new DateTimeImmutable($b, $utc));
+	}
+	return strcmp($a, $b) <=> 0;
+}
+
+// LIKE: % is any text, _ one character, the escape character makes the next one literal
+function fake_sql_like(string $value, string $pattern, string $escape): bool {
+	$regex = '';
+	for ($i = 0; $i < strlen($pattern); $i++) {
+		$char = $pattern[$i];
+		if ($char === $escape && $i + 1 < strlen($pattern)) {
+			$regex .= preg_quote($pattern[++$i], '/');
+		} elseif ($char === '%') {
+			$regex .= '.*';
+		} elseif ($char === '_') {
+			$regex .= '.';
+		} else {
+			$regex .= preg_quote($char, '/');
+		}
+	}
+	return preg_match('/^'.$regex.'$/s', $value) === 1;
 }
 
 class database {
@@ -261,7 +622,11 @@ class database {
 		return self::$instance;
 	}
 
+	// like FusionPBX 5.6.5, a database error returns false (simulated by select_fails)
 	public function select(string $sql, ?array $parameters = array(), string $return_type = 'all') {
+		if (FakeStore::read()['select_fails'] ?? false) {
+			return false;
+		}
 		return fake_sql($sql, $parameters, $return_type);
 	}
 

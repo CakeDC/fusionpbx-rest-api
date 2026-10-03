@@ -144,4 +144,139 @@ class FakesTest extends TestCase
 
 		$this->assertSame(array('c', 'b', 'a'), array_column($rows, 'username'));
 	}
+	private function seedCalls(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_xml_cdr'] = array(
+				array('xml_cdr_uuid' => 'a1', 'leg' => 'a', 'number' => '100%', 'start_stamp' => '2026-09-01 10:00:00+00', 'bridge_uuid' => 'b1', 'originating_leg_uuid' => null),
+				array('xml_cdr_uuid' => 'b1', 'leg' => 'b', 'number' => '1001', 'start_stamp' => '2026-09-01 12:00:00+02', 'bridge_uuid' => null, 'originating_leg_uuid' => 'a1'),
+				array('xml_cdr_uuid' => 'b2', 'leg' => 'b', 'number' => null, 'start_stamp' => '2026-09-02 10:00:00+00', 'originating_leg_uuid' => null),
+			);
+		});
+	}
+
+	private function select(string $where, array $parameters = array()): array
+	{
+		return array_column(fake_sql("SELECT c.xml_cdr_uuid FROM v_xml_cdr c WHERE ".$where." ORDER BY c.xml_cdr_uuid", $parameters), 'xml_cdr_uuid');
+	}
+
+	public function testWhereCombinesAndOrNotWithParentheses(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1', 'b2'), $this->select("c.leg = 'a' OR (c.leg = 'b' AND NOT c.xml_cdr_uuid = :uuid)", array('uuid' => 'b1')));
+	}
+
+	// like SQL, a comparison with NULL is unknown, and so is its negation
+	public function testWhereTreatsNullAsUnknown(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1', 'b1'), $this->select("NOT c.number = 'x'"));
+		$this->assertSame(array('b2'), $this->select("c.number IS NULL"));
+		$this->assertSame(array('a1', 'b1'), $this->select("c.number IS NOT NULL"));
+		$this->assertSame(array('a1', 'b1', 'b2'), $this->select("c.missing_column IS NULL"));
+	}
+
+	public function testWhereSupportsInAndNotIn(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1', 'b1'), $this->select("c.xml_cdr_uuid IN (:x, :y)", array('x' => 'a1', 'y' => 'b1')));
+		$this->assertSame(array('b1'), $this->select("c.number NOT IN ('100%')"));
+	}
+
+	public function testWhereLikeHonoursWildcardsAndEscapes(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1', 'b1'), $this->select("c.number LIKE '10_%'"));
+		$this->assertSame(array('a1'), $this->select("c.number LIKE :pattern ESCAPE '\\'", array('pattern' => '%0\\%')));
+		$this->assertSame(array(), $this->select("c.number LIKE '%\\_%' ESCAPE '\\'"));
+	}
+
+	public function testWhereComparesTimestampsAsInstants(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1', 'b1'), $this->select("c.start_stamp = :t", array('t' => '2026-09-01 10:00:00+00:00')));
+		$this->assertSame(array('b2'), $this->select("c.start_stamp > :t", array('t' => '2026-09-01T10:00:00Z')));
+	}
+
+	public function testWhereRunsCorrelatedExistsSubqueries(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1'), $this->select("EXISTS (SELECT 1 FROM v_xml_cdr l WHERE l.originating_leg_uuid = c.xml_cdr_uuid)"));
+		$this->assertSame(array('a1', 'b2'), $this->select("NOT EXISTS (SELECT 1 FROM v_xml_cdr p WHERE p.leg = 'a' AND p.bridge_uuid = CAST(c.xml_cdr_uuid AS text))"));
+	}
+
+	public function testSelectCountsAndPages(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(3, fake_sql("SELECT COUNT(*) FROM v_xml_cdr c WHERE c.leg IN ('a', 'b')", null, 'column'));
+		$this->assertSame(array('b1'), array_column(fake_sql("SELECT c.xml_cdr_uuid FROM v_xml_cdr c ORDER BY c.xml_cdr_uuid LIMIT 1 OFFSET 1", null), 'xml_cdr_uuid'));
+		$this->assertSame(array(), fake_sql("SELECT c.xml_cdr_uuid FROM v_xml_cdr c ORDER BY c.xml_cdr_uuid LIMIT 2 OFFSET 3", null));
+	}
+
+	public function testWhereRejectsUnsupportedSql(): void
+	{
+		$this->expectException(\RuntimeException::class);
+
+		fake_sql("SELECT c.xml_cdr_uuid FROM v_xml_cdr c WHERE c.number ~ '1'", null);
+	}
+
+	// FusionPBX 5.6.5 stores v_xml_cdr.bridge_uuid as text and the other leg
+	// ids as uuid. Postgres has no text = uuid operator, so a query comparing
+	// them fails on a real server unless one side is cast
+	public function testWhereRejectsComparingTextWithUuidColumnsLikePostgres(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('b1'), $this->select("EXISTS (SELECT 1 FROM v_xml_cdr p WHERE p.bridge_uuid = CAST(c.xml_cdr_uuid AS text))"));
+		$this->assertSame(array('b1'), $this->select("c.xml_cdr_uuid = :uuid", array('uuid' => 'b1')));
+
+		$this->expectExceptionMessage('operator does not exist: text = uuid');
+		$this->select("EXISTS (SELECT 1 FROM v_xml_cdr p WHERE p.bridge_uuid = c.xml_cdr_uuid)");
+	}
+
+	// FusionPBX 5.6.5's select() catches the PDOException and returns false
+	public function testSelectReturnsFalseWhenTheDatabaseFails(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['select_fails'] = true;
+		});
+
+		$this->assertFalse((new \database)->select("SELECT u.username FROM v_users u", null, 'all'));
+	}
+
+	// uncorrelated IN (SELECT ...): Postgres hashes the set once per query,
+	// where a correlated EXISTS on an unindexed column scans the table per row
+	public function testWhereSupportsInSubqueries(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('a1'), $this->select("c.xml_cdr_uuid IN (SELECT l.originating_leg_uuid FROM v_xml_cdr l WHERE l.leg = 'b')"));
+		$this->assertSame(array('b1'), $this->select("CAST(c.xml_cdr_uuid AS text) IN (SELECT p.bridge_uuid FROM v_xml_cdr p WHERE p.leg = :leg)", array('leg' => 'a')));
+		$this->assertSame(array('a1', 'b2'), $this->select("CAST(c.xml_cdr_uuid AS text) NOT IN (SELECT p.bridge_uuid FROM v_xml_cdr p WHERE p.bridge_uuid IS NOT NULL)"));
+	}
+
+	// like SQL, NOT IN is unknown when the set holds a NULL and nothing matches
+	public function testWhereNotInWithANullInTheSetIsUnknown(): void
+	{
+		$this->seedCalls();
+
+		$this->assertSame(array('b1'), $this->select("CAST(c.xml_cdr_uuid AS text) IN (SELECT p.bridge_uuid FROM v_xml_cdr p)"));
+		$this->assertSame(array(), $this->select("CAST(c.xml_cdr_uuid AS text) NOT IN (SELECT p.bridge_uuid FROM v_xml_cdr p)"));
+		$this->assertSame(array(), $this->select("c.number NOT IN ('x', NULL)"));
+	}
+
+	public function testWhereRejectsAnInSubqueryOfAnotherType(): void
+	{
+		$this->seedCalls();
+
+		$this->expectExceptionMessage('operator does not exist: uuid = text');
+		$this->select("c.xml_cdr_uuid IN (SELECT p.bridge_uuid FROM v_xml_cdr p)");
+	}
 }

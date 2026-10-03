@@ -122,3 +122,40 @@ function rest_api_decode_destination($destination) {
     }
     return $destination;
 }
+
+// cdr-search and cdr-details: the Cdr of the ZuluCall contract (#43937)
+const REST_API_CDR_FIELDS = array(
+    "xml_cdr_uuid",
+    "direction",
+    "caller_id_name",
+    "caller_id_number",
+    "destination_number",
+    "start_stamp",
+    "end_stamp",
+    "duration",
+    "hangup_cause",
+    "hangup_cause_q850",
+    "missed_call",
+    "leg",
+    "bridge_uuid",
+    "originating_leg_uuid",
+    "extension_uuid",
+    "record_name",
+    "record_path",
+    "call_center_queue_uuid",
+    "cc_queue"
+);
+
+// the database may return numbers as text and booleans as "t"/"f". record_name
+// and record_path are null when the call was not recorded
+function rest_api_format_cdr($cdr) {
+    $cdr['duration'] = (int)$cdr['duration'];
+    $cdr['hangup_cause_q850'] = is_numeric($cdr['hangup_cause_q850']) ? (int)$cdr['hangup_cause_q850'] : null;
+    $cdr['missed_call'] = in_array($cdr['missed_call'], array(true, 1, "1", "t", "true"), true);
+    foreach(array("record_name", "record_path") as $column) {
+        if($cdr[$column] === "") {
+            $cdr[$column] = null;
+        }
+    }
+    return $cdr;
+}
