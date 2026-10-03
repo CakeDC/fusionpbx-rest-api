@@ -1,6 +1,7 @@
 <?php
 namespace RestApi\Test\Http;
 
+use RestApi\Test\Support\AdminKeysHelpers;
 use RestApi\Test\Support\RestApiTestCase;
 
 /**
@@ -8,55 +9,7 @@ use RestApi\Test\Support\RestApiTestCase;
  */
 class AdminKeysTest extends RestApiTestCase
 {
-	private const ALL = 'rest_api_key_view,rest_api_key_add,rest_api_key_edit,rest_api_key_delete';
-	private const OPS_USER = 'dddddddd-0000-4000-8000-000000000002';
-
-	private string $cookie = '';
-
-	protected function tables(): array
-	{
-		$tables = parent::tables();
-		$tables['v_users'][] = array('user_uuid' => self::OPS_USER, 'domain_uuid' => self::OTHER_DOMAIN_UUID, 'username' => 'ops', 'user_enabled' => 'false');
-		return $tables;
-	}
-
-	private function login(string $permissions = self::ALL): void
-	{
-		$response = $this->request('GET', '/login.php?permissions='.$permissions);
-		$this->cookie = explode(';', $response['headers']['set-cookie'][0])[0];
-	}
-
-	private function page(string $path): array
-	{
-		return $this->request('GET', '/app/rest_api/'.$path, '', array('Cookie' => $this->cookie));
-	}
-
-	private function submit(string $path, array $fields): array
-	{
-		return $this->request('POST', '/app/rest_api/'.$path, http_build_query($fields), array(
-			'Cookie' => $this->cookie,
-			'Content-Type' => 'application/x-www-form-urlencoded',
-		));
-	}
-
-	/** The CSRF token field rendered in a page, as name => value. */
-	private function tokenField(array $page): array
-	{
-		$this->assertMatchesRegularExpression("/<input type='hidden' name='([0-9a-f]{16})' value='([0-9a-f]{32})'>/", $page['body'], 'page has no CSRF token');
-		preg_match("/<input type='hidden' name='([0-9a-f]{16})' value='([0-9a-f]{32})'>/", $page['body'], $m);
-		return array($m[1] => $m[2]);
-	}
-
-	/** Valid form fields for a key bound to the API user. */
-	private function keyFields(array $overrides = array()): array
-	{
-		return array_merge(array('name' => 'Billing', 'key_uuid' => '', 'user_uuid' => self::USER_UUID, 'key_enabled' => 'true', 'expires' => ''), $overrides);
-	}
-
-	private function keys(): array
-	{
-		return $this->state()['tables']['rest_api_keys'] ?? array();
-	}
+	use AdminKeysHelpers;
 
 	public function testListRequiresTheViewPermission(): void
 	{
@@ -169,10 +122,12 @@ class AdminKeysTest extends RestApiTestCase
 		$this->login();
 		$form = $this->page('key_edit.php?key_uuid='.self::KEY_ID);
 
-		$this->submit('key_edit.php', array('name' => 'Invoicing', 'key_uuid' => self::KEY_ID, 'user_uuid' => self::OPS_USER, 'expires' => '2026-12-31T23:30') + $this->tokenField($form));
+		$this->submit('key_edit.php', array('name' => 'Invoicing', 'key_uuid' => self::KEY_ID, 'user_uuid' => self::OPS_USER, 'expires' => '2026-12-31T23:30:15') + $this->tokenField($form));
 
 		$key = $this->keys()[0];
-		$this->assertSame(array('Invoicing', self::OPS_USER, 'false', '2026-12-31 23:30:00'), array($key['name'], $key['user_uuid'], $key['key_enabled'], $key['expires']));
+		$this->assertSame(array('Invoicing', self::OPS_USER, 'false'), array($key['name'], $key['user_uuid'], $key['key_enabled']));
+		// compare instants: the stored text carries an offset
+		$this->assertSame(strtotime('2026-12-31T23:30:15'), strtotime($key['expires']));
 	}
 
 	public function testUserPickerListsUsersOfEveryDomain(): void

@@ -58,8 +58,8 @@ const REST_API_EXTENSION_FIELDS = array(
     "max_registrations",
     "insert_date",
     "insert_user",
-        "update_date",
-        "update_user"
+    "update_date",
+    "update_user"
 );
 
 const REST_API_DESTINATION_FIELDS = array(

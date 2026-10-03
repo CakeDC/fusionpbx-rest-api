@@ -33,6 +33,7 @@ $name = "";
 $user_uuid = "";
 $key_enabled = true;
 $expires = "";
+$expires_warning = null;
 $key_secret = null;
 $error = null;
 
@@ -68,7 +69,8 @@ if(!empty($_POST)) {
         if($time === false) {
             $error = "invalid expiry date";
         } else {
-            $expires_at = date('Y-m-d H:i:s', $time);
+            // explicit offset: a timestamptz column would otherwise read it in the database's time zone
+            $expires_at = date('Y-m-d H:i:sP', $time);
         }
     }
 
@@ -111,7 +113,15 @@ if(!empty($_POST)) {
     $name = (string)$key['name'];
     $user_uuid = (string)$key['user_uuid'];
     $key_enabled = rest_api_is_true($key['key_enabled']);
-    $expires = empty($key['expires']) ? '' : date('Y-m-d\TH:i', strtotime($key['expires']));
+    if(!empty($key['expires'])) {
+        $time = strtotime((string)$key['expires']);
+        if($time === false) {
+            // don't show 1970-01-01 for a value we can't read
+            $expires_warning = "stored expiry could not be read: ".$key['expires'];
+        } else {
+            $expires = date('Y-m-d\TH:i:s', $time); // with seconds, so saving unchanged keeps the instant
+        }
+    }
 } elseif(!permission_exists('rest_api_key_add')) {
     deny_access();
 }
@@ -214,7 +224,8 @@ foreach($users as $user) {
     <tr>
         <td width="30%" class="vncell" valign="top" align="left" nowrap="nowrap">Expires</td>
         <td width="70%" class="vtable" align="left">
-            <input class="formfld" type="datetime-local" name="expires" value="<?php echo escape($expires); ?>"<?php echo $disabled; ?> /><br />
+            <input class="formfld" type="datetime-local" step="1" name="expires" value="<?php echo escape($expires); ?>"<?php echo $disabled; ?> /><br />
+            <?php echo $expires_warning ? "<b>".escape($expires_warning)."</b><br />" : ""; ?>
             empty: never expires
         </td>
     </tr>

@@ -3,7 +3,7 @@ An HTTP API for [FusionPBX](http://www.fusionpbx.com/).
 
 # Install
 To install it, clone into fusionpbx's `app/` folder. Make sure this repo clones into a folder called `rest_api`.
-Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema and Menu Defaults, press Execute.
+Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions.)
 
 # Compatibility
 
@@ -80,12 +80,12 @@ Lookups never return records of domains the user can't act on: they answer 404 a
 
 ## Actions from other apps
 
-Other FusionPBX apps can expose actions through an `app_api.php` file (call them with `"app": "<app name>"`). Each such action file must declare the FusionPBX permissions it needs, for example `$required_permissions = array("my_app_view");`, or `array()` for none. Actions that don't declare them aren't run. `do_action()` receives the request body and, as an optional second argument, the context: `domain_explicit`, `cross_domain` and `user_domain_uuid`.
+Other FusionPBX apps can expose actions through an `app_api.php` file (call them with `"app": "<app name>"`). Each such action file must declare the FusionPBX permissions it needs, for example `$required_permissions = array("my_app_view");`, or `array()` for none. Actions that don't declare them aren't run. `do_action()` receives the request body and, as an optional second argument, the context: `domain_explicit`, `cross_domain` and `user_domain_uuid`. Do all the work inside `do_action()`: top-level code in the action file runs before `rest.php` checks `$required_permissions`.
 
 ## Upgrading from earlier versions
 
 This version changes how keys work:
-- After upgrading (Advanced → Upgrade → Schema), **existing keys stop working** until a superadmin edits each one, picks a user and enables it.
+- After upgrading, run Advanced → Upgrade → Schema, Menu Defaults and Permission Defaults, then log out and back in (permissions are cached in the session) before editing keys. **Existing keys stop working** until a superadmin edits each one, picks a user and enables it.
 - Each integration's user needs the permissions listed above.
 - Responses only contain the documented columns. `extension-create` no longer returns the SIP password unless the user has `extension_password`. Anything that read other columns from `extension-create`, `destination-create`, `destination-details`, `ringgroup-create` or `domain-details` must be updated.
 - `domain_uuid` is now optional. It defaults to the key user's domain.
