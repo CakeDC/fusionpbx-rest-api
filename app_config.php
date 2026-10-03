@@ -60,8 +60,42 @@ $apps[$x]['db'][$y]['fields'][$z]['type']['mysql'] = 'date';
 $apps[$x]['db'][$y]['fields'][$z]['description']['en-us'] = "date this key was last used";
 $z++;
 
+$apps[$x]['db'][$y]['fields'][$z]['name'] = "user_uuid";
+$apps[$x]['db'][$y]['fields'][$z]['type']['pgsql'] = 'uuid';
+$apps[$x]['db'][$y]['fields'][$z]['type']['sqlite'] = 'text';
+$apps[$x]['db'][$y]['fields'][$z]['type']['mysql'] = 'char(36)';
+$apps[$x]['db'][$y]['fields'][$z]['description']['en-us'] = "FusionPBX user the key acts as";
+$z++;
+
+$apps[$x]['db'][$y]['fields'][$z]['name'] = "key_enabled";
+$apps[$x]['db'][$y]['fields'][$z]['type']['pgsql'] = 'boolean';
+$apps[$x]['db'][$y]['fields'][$z]['type']['sqlite'] = 'text';
+$apps[$x]['db'][$y]['fields'][$z]['type']['mysql'] = 'text';
+$apps[$x]['db'][$y]['fields'][$z]['toggle'] = ['true','false'];
+$apps[$x]['db'][$y]['fields'][$z]['description']['en-us'] = "only enabled keys authenticate";
+$z++;
+
+$apps[$x]['db'][$y]['fields'][$z]['name'] = "expires";
+$apps[$x]['db'][$y]['fields'][$z]['type']['pgsql'] = 'timestamptz';
+$apps[$x]['db'][$y]['fields'][$z]['type']['sqlite'] = 'date';
+$apps[$x]['db'][$y]['fields'][$z]['type']['mysql'] = 'datetime';
+$apps[$x]['db'][$y]['fields'][$z]['description']['en-us'] = "date this key stops working, empty for never";
+$z++;
+
 $y=0;
 
-$apps[$x]['permissions'][$y]['name'] = "rest_api_manage_keys";
+$apps[$x]['permissions'][$y]['name'] = "rest_api_key_view";
+$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+$y++;
+
+$apps[$x]['permissions'][$y]['name'] = "rest_api_key_add";
+$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+$y++;
+
+$apps[$x]['permissions'][$y]['name'] = "rest_api_key_edit";
+$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+$y++;
+
+$apps[$x]['permissions'][$y]['name'] = "rest_api_key_delete";
 $apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 $y++;
