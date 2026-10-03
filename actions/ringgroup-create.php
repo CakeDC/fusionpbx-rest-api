@@ -1,5 +1,6 @@
 <?php
 $required_params = array("domain_uuid", "name", "extension", "destinations", "strategy");
+$required_permissions = array("ring_group_add", "ring_group_destination_add", "dialplan_add");
 
 function do_action($body) {
     if(!is_string($body->name)) {
@@ -104,10 +105,6 @@ function do_action($body) {
         "dialplan_description" => "",
         "app_uuid" => "1d61fb65-1eec-bc73-a6ee-a6203b4fe6f2" // ring group app
     );
-
-    $_SESSION["permissions"]["ring_group_add"] = true;
-    $_SESSION["permissions"]["ring_group_destination_add"] = true;
-    $_SESSION["permissions"]["dialplan_add"] = true;
 
     $database = new database;
     $database->app_name = 'rest_api';

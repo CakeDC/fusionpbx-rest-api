@@ -112,7 +112,23 @@ if(!file_exists($file)) {
 	return_error("unknown action", 400);
 }
 
+// only the action file can declare what it needs: anything set before, e.g.
+// by an app's app_api.php, doesn't count. undeclared actions never run
+$required_permissions = null;
 include($file);
+if(!is_array($required_permissions)) {
+	error_log("refusing to run action ".$action.": it does not declare \$required_permissions");
+	return_error("action does not declare permissions", 500);
+}
+
+// checked before the parameters, so callers without access don't learn what an action expects
+$missing_permissions = rest_api_missing_permissions($required_permissions);
+if($missing_permissions) {
+	http_response_code(403);
+	echo json_encode(array("error" => "forbidden", "missing_permissions" => $missing_permissions));
+	die();
+}
+
 $validation_errors = ensure_parameters($body, $required_params);
 if($validation_errors) {
 	return_error($validation_errors, 400);

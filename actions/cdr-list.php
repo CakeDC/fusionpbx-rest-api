@@ -1,5 +1,6 @@
 <?php
 $required_params = array("domain_uuid");
+$required_permissions = array("xml_cdr_view");
 
 function do_action($body) {
     $fields = array(

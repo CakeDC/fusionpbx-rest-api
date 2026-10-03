@@ -1,5 +1,6 @@
 <?php
 $required_params = array("number");
+$required_permissions = array("destination_view");
 function do_action($body) {
     $sql = "SELECT * FROM v_destinations WHERE destination_number = :number";
     $parameters['number'] = $body->number;

@@ -1,5 +1,6 @@
 <?php
 $required_params = array();
+$required_permissions = array();
 
 function do_action($body) {
     if(empty($body->domain_uuid) && empty($body->domain_name)) {

@@ -1,5 +1,6 @@
 <?php
 $required_params = array("domain_uuid", "extension");
+$required_permissions = array("extension_add", "voicemail_add");
 function do_action($body) {    
     $caller_id_name = "";
     if(!empty($body->caller_id_name)) {
@@ -83,9 +84,6 @@ function do_action($body) {
         "voicemail_enabled" => "true",
         "voicemail_description" => ""
     );
-
-    $_SESSION["permissions"]["extension_add"] = true;
-    $_SESSION["permissions"]["voicemail_add"] = true;
 
     $database = new database;
     $database->app_name = 'rest_api';

@@ -75,3 +75,14 @@ function rest_api_start_user_request(array $key) {
 	(new groups($database, $domain_uuid, $user_uuid))->session();
 	permissions::new($database, $domain_uuid, $user_uuid)->session();
 }
+
+// the permissions in $required that the request's user doesn't have
+function rest_api_missing_permissions(array $required) {
+	$missing = array();
+	foreach($required as $permission) {
+		if(!permission_exists($permission)) {
+			$missing[] = $permission;
+		}
+	}
+	return $missing;
+}

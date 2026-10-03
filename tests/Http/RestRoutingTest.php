@@ -13,7 +13,7 @@ class RestRoutingTest extends RestApiTestCase
 			'app/outside.php' => $marker,
 			// an app exposing an action through its own app_api.php mapping
 			'app/call_stats/app_api.php' => '<?php $app_api["call_stats"]["call-stats"] = "api/stats.php";',
-			'app/call_stats/api/stats.php' => '<?php $required_params = array(); function do_action($body) { return array("calls" => 42); }',
+			'app/call_stats/api/stats.php' => '<?php $required_params = array(); $required_permissions = array(); function do_action($body) { return array("calls" => 42); }',
 			// an app without an API
 			'app/no_api/index.php' => '<?php',
 			// an app whose mapping points outside its own directory

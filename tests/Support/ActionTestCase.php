@@ -13,6 +13,9 @@ abstract class ActionTestCase extends TestCase
 	/** Action file name without extension, e.g. "originate". */
 	abstract protected function action(): string;
 
+	/** Permissions the action declares. setUp() grants exactly these. */
+	protected array $requiredPermissions = array();
+
 	protected function setUp(): void
 	{
 		require_once FUSIONPBX_FAKES_DIR.'/resources/fakes.php';
@@ -20,6 +23,17 @@ abstract class ActionTestCase extends TestCase
 		$_SESSION = array();
 		FakeStore::reset($this->tables());
 		require PLUGIN_DIR.'/actions/'.$this->action().'.php';
+		$this->requiredPermissions = $required_permissions ?? array();
+		$this->grantOnly($this->requiredPermissions);
+	}
+
+	/**
+	 * Give the user exactly these permissions. FusionPBX keeps the permissions
+	 * of the first check, so call this before running the action.
+	 */
+	protected function grantOnly(array $permissions): void
+	{
+		$_SESSION['permissions'] = array_fill_keys($permissions, true);
 	}
 
 	/** Initial table rows, keyed by table name. */

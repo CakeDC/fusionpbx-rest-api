@@ -1,5 +1,6 @@
 <?php
 $required_params = array("domain_uuid", "number", "extension");
+$required_permissions = array("destination_add", "dialplan_add", "dialplan_detail_add");
 
 function do_action($body) {
     // number is used in dialplan regular expressions, so digits only (a "."
@@ -104,10 +105,6 @@ function do_action($body) {
             )
         )
     );
-
-    $_SESSION["permissions"]["dialplan_detail_add"] = true;
-    $_SESSION["permissions"]["dialplan_add"] = true;
-    $_SESSION["permissions"]["destination_add"] = true;
 
     $database = new database;
     $database->app_name = 'rest_api';

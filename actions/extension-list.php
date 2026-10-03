@@ -1,5 +1,6 @@
 <?php
 $required_params = array("domain_uuid");
+$required_permissions = array("extension_view");
 
 function do_action($body) {
     $sql = "SELECT extension_uuid, extension, emergency_caller_id_number FROM v_extensions WHERE v_extensions.domain_uuid = :domain_uuid";

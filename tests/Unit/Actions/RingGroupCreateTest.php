@@ -45,6 +45,7 @@ class RingGroupCreateTest extends ActionTestCase
 		$this->assertSame(array('100', '101'), array_column($tables['v_ring_group_destinations'], 'destination_number'));
 		$this->assertSame('tenant1.example.com', $tables['v_dialplans'][0]['dialplan_context']);
 		$this->assertStringContainsString('<condition field="destination_number" expression="^200$">', $tables['v_dialplans'][0]['dialplan_xml']);
+		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
 	}
 
 	public function testEscapesTheNameInTheDialplanXml(): void

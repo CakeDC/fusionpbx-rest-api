@@ -32,6 +32,7 @@ class ExtensionCreateTest extends ActionTestCase
 		$this->assertSame(array('Sales', '5551000'), array($result['outbound_caller_id_name'], $result['outbound_caller_id_number']));
 		$this->assertSame(10, strlen($result['password']));
 		$this->assertSame('101', $tables['v_voicemails'][0]['voicemail_id']);
+		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
 	}
 
 	public function testRejectsAnExistingExtension(): void

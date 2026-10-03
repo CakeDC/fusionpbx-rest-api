@@ -51,6 +51,7 @@ class DestinationCreateTest extends ActionTestCase
 			array('^(5551234)$', '100 XML tenant1.example.com'),
 			array_column($tables['v_dialplan_details'], 'dialplan_detail_data')
 		);
+		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
 	}
 
 	public function testRejectsANumberThatIsAlreadyRouted(): void

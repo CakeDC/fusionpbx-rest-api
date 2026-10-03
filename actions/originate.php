@@ -1,5 +1,6 @@
 <?php
 $required_params = array("domain_uuid", "caller_id_number", "destination_a", "destination_b");
+$required_permissions = array("click_to_call_call");
 
 function do_action($body) {
   foreach(array("caller_id_number", "destination_a", "destination_b") as $field) {
