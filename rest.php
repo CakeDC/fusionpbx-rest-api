@@ -29,6 +29,7 @@ require_once "root.php";
 require_once "resources/require.php";
 require_once "lib/input_validation.php";
 require_once "lib/auth.php";
+require_once "lib/fields.php";
 
 // whatever require.php did, never save the session. cookies are disabled, so
 // any session started from here on is a new, empty one and safe to destroy

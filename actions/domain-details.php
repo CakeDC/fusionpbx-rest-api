@@ -8,7 +8,7 @@ function do_action($body, $context = array()) {
         if(!is_string($body->domain_name)) {
             return array("error" => "domain not found", "code" => 404);
         }
-        $sql = "SELECT * FROM v_domains WHERE domain_name = :domain_name";
+        $sql = "SELECT ".implode(", ", REST_API_DOMAIN_FIELDS)." FROM v_domains WHERE domain_name = :domain_name";
         $domain = $database->select($sql, array('domain_name' => $body->domain_name), 'row');
         // rest.php only checked the domain_uuid it filled in. a named domain the
         // user may not act on is "not found" rather than forbidden, so names
@@ -17,7 +17,7 @@ function do_action($body, $context = array()) {
             $domain = false;
         }
     } else {
-        $sql = "SELECT * FROM v_domains WHERE domain_uuid = :domain_uuid";
+        $sql = "SELECT ".implode(", ", REST_API_DOMAIN_FIELDS)." FROM v_domains WHERE domain_uuid = :domain_uuid";
         $domain = $database->select($sql, array('domain_uuid' => $body->domain_uuid), 'row');
     }
     if(!$domain) {

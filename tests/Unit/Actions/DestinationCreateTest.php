@@ -37,7 +37,9 @@ class DestinationCreateTest extends ActionTestCase
 
 		$tables = $this->state()['tables'];
 		$destination = $tables['v_destinations'][1];
-		$this->assertSame($destination, $result);
+		$this->assertSame(REST_API_DESTINATION_FIELDS, array_keys($result));
+		$this->assertSame($destination['destination_uuid'], $result['destination_uuid']);
+		$this->assertEquals(array((object)array('destination_app' => 'transfer', 'destination_data' => '100 XML tenant1.example.com')), $result['destination_actions']);
 		$this->assertSame('5551234', $destination['destination_number']);
 		$this->assertSame('^(5551234)$', $destination['destination_number_regex']);
 		$this->assertSame('public', $destination['destination_context']);

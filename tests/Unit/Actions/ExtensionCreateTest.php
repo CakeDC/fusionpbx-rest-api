@@ -26,13 +26,24 @@ class ExtensionCreateTest extends ActionTestCase
 		$result = $this->runAction(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '101', 'caller_id_name' => 'Sales', 'caller_id_number' => '5551000'));
 
 		$tables = $this->state()['tables'];
-		$this->assertSame($tables['v_extensions'][1], $result);
+		$this->assertSame(REST_API_EXTENSION_FIELDS, array_keys($result));
+		$this->assertSame($tables['v_extensions'][1]['extension_uuid'], $result['extension_uuid']);
 		$this->assertSame('101', $result['extension']);
 		$this->assertSame('tenant1.example.com', $result['user_context']);
 		$this->assertSame(array('Sales', '5551000'), array($result['outbound_caller_id_name'], $result['outbound_caller_id_number']));
-		$this->assertSame(10, strlen($result['password']));
+		$this->assertArrayNotHasKey('password', $result);
 		$this->assertSame('101', $tables['v_voicemails'][0]['voicemail_id']);
 		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
+	}
+
+	public function testReturnsTheSipPasswordToUsersAllowedToSeeIt(): void
+	{
+		$this->grantOnly(array_merge($this->requiredPermissions, array('extension_password')));
+
+		$result = $this->runAction(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '101'));
+
+		$this->assertSame(10, strlen($result['password']));
+		$this->assertSame($this->state()['tables']['v_extensions'][1]['password'], $result['password']);
 	}
 
 	public function testRejectsAnExistingExtension(): void

@@ -113,9 +113,8 @@ function do_action($body) {
         return array("error" => "error adding destination");
     }
 
-    $sql = "SELECT * FROM v_destinations WHERE destination_uuid = :destination_uuid";
+    $sql = "SELECT ".implode(", ", REST_API_DESTINATION_FIELDS)." FROM v_destinations WHERE destination_uuid = :destination_uuid";
     $parameters['destination_uuid'] = $destination_uuid;
     $database = new database;
-    $extension = $database->select($sql, $parameters, 'row');
-    return $extension;
+    return rest_api_decode_destination($database->select($sql, $parameters, 'row'));
 }

@@ -113,9 +113,11 @@ function do_action($body) {
         return array("error" => "error adding ring group");
     }
 
-    $sql = "SELECT * FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
     $parameters['ring_group_uuid'] = $ring_group_uuid;
     $database = new database;
+    $sql = "SELECT ".implode(", ", REST_API_RING_GROUP_FIELDS)." FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
     $ring_group = $database->select($sql, $parameters, 'row');
+    $sql = "SELECT ".implode(", ", REST_API_RING_GROUP_DESTINATION_FIELDS)." FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
+    $ring_group['ring_group_destinations'] = $database->select($sql, $parameters, 'all');
     return $ring_group;
 }

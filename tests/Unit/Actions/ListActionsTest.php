@@ -156,4 +156,18 @@ class ListActionsTest extends ActionTestCase
 
 		$this->assertSame(404, $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5550000'))['code']);
 	}
+
+	public function testDomainDetailsReturnsOnlyTheDomainColumns(): void
+	{
+		$this->load('domain-details');
+
+		$this->assertSame(REST_API_DOMAIN_FIELDS, array_keys($this->runAction(array('domain_uuid' => self::DOMAIN_UUID))));
+	}
+
+	public function testDestinationDetailsReturnsOnlyTheDestinationColumns(): void
+	{
+		$this->load('destination-details');
+
+		$this->assertSame(REST_API_DESTINATION_FIELDS, array_keys($this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234'))));
+	}
 }

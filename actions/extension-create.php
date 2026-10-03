@@ -92,8 +92,15 @@ function do_action($body) {
         return array("error" => "error adding extension");
     }
 
-    $sql = "SELECT * FROM v_extensions WHERE extension_uuid = :extension_uuid";
+    $sql = "SELECT ".implode(", ", REST_API_EXTENSION_FIELDS)." FROM v_extensions WHERE extension_uuid = :extension_uuid";
     $parameters['extension_uuid'] = $extension_uuid;
     $database = new database;
-    return $database->select($sql, $parameters, 'row');
+    $extension = $database->select($sql, $parameters, 'row');
+    // the SIP password lets an integration provision the phone. FusionPBX only
+    // shows it to users with extension_password, so the API does the same
+    if($extension && permission_exists('extension_password')) {
+        $sql = "SELECT password FROM v_extensions WHERE extension_uuid = :extension_uuid";
+        $extension['password'] = $database->select($sql, $parameters, 'column');
+    }
+    return $extension;
 }

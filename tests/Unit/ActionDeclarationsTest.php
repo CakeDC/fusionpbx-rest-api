@@ -57,4 +57,11 @@ class ActionDeclarationsTest extends TestCase
 			$this->assertDoesNotMatchRegularExpression('/\$_SESSION\s*\[\s*[\'"]permissions[\'"]\s*\]/', file_get_contents($file), basename($file));
 		}
 	}
+
+	public function testNoActionReturnsEveryColumn(): void
+	{
+		foreach (glob(PLUGIN_DIR.'/actions/*.php') as $file) {
+			$this->assertDoesNotMatchRegularExpression('/select\s+\*/i', file_get_contents($file), basename($file));
+		}
+	}
 }
