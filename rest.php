@@ -13,6 +13,11 @@ if(session_status() === PHP_SESSION_ACTIVE) {
 }
 $_SESSION = array();
 
+// FusionPBX's require.php switches domains when the query string asks for it.
+// that checks a permission before we know the key's user, and FusionPBX keeps
+// the (empty) result for the whole request. the API only reads the JSON body
+$_GET = array();
+
 // ask require.php not to start a session. in case it starts one anyway, make
 // sure it can't resume a browser session from its cookie or send a cookie
 $no_session = true;
@@ -23,6 +28,7 @@ ini_set('session.use_trans_sid', '0');
 require_once "root.php";
 require_once "resources/require.php";
 require_once "lib/input_validation.php";
+require_once "lib/auth.php";
 
 // whatever require.php did, never save the session. cookies are disabled, so
 // any session started from here on is a new, empty one and safe to destroy
@@ -51,29 +57,20 @@ if(!is_uuid($_SERVER['PHP_AUTH_USER'])) {
 	return_error("unauthorized", 401);
 }
 
-// get the hash of the secret key for this key id out of the database
-$sql = "SELECT key_secret FROM rest_api_keys WHERE key_uuid = :key_id";
-$parameters['key_id'] = $_SERVER['PHP_AUTH_USER'];
-$database = new database;
-$secret = $database->select($sql, $parameters, 'column');
-if(!$secret) {
-	// spend the same time as a real check so response timing doesn't reveal which key IDs exist
-	password_verify($_SERVER['PHP_AUTH_PW'], '$2y$10$RMOGGby4/44PfMH0JmbH5e/WVfRdEXEWRh0nwMH3D0qGsNa.RTpVW');
-	error_log("rejecting request with invalid token identifier (".$_SERVER['PHP_AUTH_USER'].")");
+// the key must be enabled, not expired, and bound to an enabled user of an enabled domain
+$key = rest_api_find_key(database::new(), $_SERVER['PHP_AUTH_USER']);
+$rejection = rest_api_key_rejection($key, $_SERVER['PHP_AUTH_PW'], time());
+if($rejection !== null) {
+	error_log("rejecting request: ".$rejection." (".$_SERVER['PHP_AUTH_USER'].")");
 	return_error("unauthorized", 401);
 }
 
-// verify the hash
-if(!password_verify($_SERVER['PHP_AUTH_PW'], $secret)) {
-	error_log("rejecting request with valid token identifier but invalid secret");
-	return_error("unauthorized", 401);
-}
+// from here on the request runs as the key's user
+rest_api_start_user_request($key);
 
 // set the key last used time
 $sql = "UPDATE rest_api_keys SET last_used = NOW() WHERE key_uuid = :key_id";
-$database = new database;
-$result = $database->execute($sql, $parameters);
-unset($parameters);
+database::new()->execute($sql, array('key_id' => $_SERVER['PHP_AUTH_USER']));
 
 $body = json_decode(file_get_contents('php://input'));
 if(!is_object($body)) {
