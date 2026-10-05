@@ -23,6 +23,7 @@ class FakeStore {
 			'tables' => $tables,
 			'queries' => array(),
 			'saved' => array(),
+			'skipped' => array(),
 			'esl_commands' => array(),
 			'esl_response' => "+OK 7f4de3d2-0000-4000-8000-00000000c411\n",
 			'esl_available' => true,
@@ -90,14 +91,14 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 	$where = function ($clause) use ($value) {
 		$conditions = array();
 		foreach (preg_split('/ and /i', $clause) as $condition) {
-			if (!preg_match('/^(?:\w+\.)?(\w+) = (.+)$/', trim($condition), $m)) {
+			if (!preg_match('/^([\w.]+) = (.+)$/', trim($condition), $m)) {
 				throw new RuntimeException("unsupported SQL condition: ".$condition);
 			}
 			$conditions[$m[1]] = $value($m[2]);
 		}
 		return function ($row) use ($conditions) {
 			foreach ($conditions as $column => $expected) {
-				if (!array_key_exists($column, $row) || (string)$row[$column] !== (string)$expected) {
+				if (!isset($row[$column]) || (string)$row[$column] !== (string)$expected) {
 					return false;
 				}
 			}
@@ -105,30 +106,81 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 		};
 	};
 
-	return FakeStore::update(function (&$state) use ($sql, $parameters, $return_type, $value, $where) {
+	// FROM table [alias] [LEFT JOIN table alias ON a.column = b.column]...
+	// each row holds every column as "alias.column". the first table's columns
+	// are also there without alias, as in a single-table query
+	$from = function ($clause, array $tables) {
+		if (!preg_match('/^(\w+)(?: (?!left\b)(\w+))?((?: left join \w+ \w+ on \w+\.\w+ = \w+\.\w+)*)$/i', $clause, $m)) {
+			throw new RuntimeException("unsupported SQL from: ".$clause);
+		}
+		$alias = !empty($m[2]) ? $m[2] : $m[1];
+		$rows = array();
+		foreach ($tables[$m[1]] ?? array() as $row) {
+			foreach ($row as $column => $v) {
+				$row[$alias.'.'.$column] = $v;
+			}
+			$rows[] = $row;
+		}
+		preg_match_all('/ left join (\w+) (\w+) on (\w+\.\w+) = (\w+\.\w+)/i', $m[3] ?? '', $joins, PREG_SET_ORDER);
+		foreach ($joins as $join) {
+			list(, $table, $join_alias, $left, $right) = $join;
+			if (strpos($left, $join_alias.'.') !== 0) {
+				list($left, $right) = array($right, $left);
+			}
+			$column = substr($left, strlen($join_alias) + 1);
+			foreach ($rows as $i => $row) {
+				foreach ($tables[$table] ?? array() as $candidate) {
+					if (isset($row[$right], $candidate[$column]) && (string)$candidate[$column] === (string)$row[$right]) {
+						foreach ($candidate as $c => $v) {
+							$rows[$i][$join_alias.'.'.$c] = $v;
+						}
+						break;
+					}
+				}
+			}
+		}
+		return $rows;
+	};
+
+	return FakeStore::update(function (&$state) use ($sql, $parameters, $return_type, $value, $where, $from) {
 		$state['queries'][] = array('sql' => $sql, 'parameters' => $parameters);
 
-		if (preg_match('/^select (.+?) from (\w+)(?: where (.+?))?(?: order by (\w+)( desc| asc)?)?(?: limit (\d+))?$/i', $sql, $m)) {
-			$rows = $state['tables'][$m[2]] ?? array();
+		if (preg_match('/^select (.+?) from (.+?)(?: where (.+?))?(?: order by (.+?))?(?: limit (\d+))?$/i', $sql, $m)) {
+			$rows = $from($m[2], $state['tables']);
 			if (!empty($m[3])) {
 				$rows = array_values(array_filter($rows, $where($m[3])));
 			}
 			if (!empty($m[4])) {
-				$column = $m[4];
-				usort($rows, function ($a, $b) use ($column) { return strcmp((string)($a[$column] ?? ''), (string)($b[$column] ?? '')); });
-				if (strcasecmp(trim($m[5] ?? ''), 'desc') === 0) {
-					$rows = array_reverse($rows);
+				$order = array();
+				foreach (explode(',', $m[4]) as $part) {
+					if (!preg_match('/^([\w.]+)(?: (asc|desc))?$/i', trim($part), $o)) {
+						throw new RuntimeException("unsupported SQL order: ".$part);
+					}
+					$order[] = array($o[1], strcasecmp($o[2] ?? '', 'desc') === 0 ? -1 : 1);
 				}
+				usort($rows, function ($a, $b) use ($order) {
+					foreach ($order as list($column, $direction)) {
+						$cmp = strcmp((string)($a[$column] ?? ''), (string)($b[$column] ?? ''));
+						if ($cmp !== 0) {
+							return $cmp * $direction;
+						}
+					}
+					return 0;
+				});
 			}
-			if (!empty($m[6])) {
-				$rows = array_slice($rows, 0, (int)$m[6]);
+			if (!empty($m[5])) {
+				$rows = array_slice($rows, 0, (int)$m[5]);
 			}
-			if (trim($m[1]) !== '*') {
-				$columns = array_map(function ($c) { return preg_replace('/^\w+\./', '', trim($c)); }, explode(',', $m[1]));
+			if (trim($m[1]) === '*') {
+				$rows = array_map(function ($row) {
+					return array_filter($row, function ($column) { return strpos($column, '.') === false; }, ARRAY_FILTER_USE_KEY);
+				}, $rows);
+			} else {
+				$columns = array_map('trim', explode(',', $m[1]));
 				$rows = array_map(function ($row) use ($columns) {
 					$out = array();
 					foreach ($columns as $c) {
-						$out[$c] = $row[$c] ?? null;
+						$out[preg_replace('/^\w+\./', '', $c)] = $row[$c] ?? null;
 					}
 					return $out;
 				}, $rows);
@@ -178,8 +230,36 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 }
 
 class database {
+	private static $instance = null;
 	public $app_name;
 	public $app_uuid;
+	public $user_uuid;
+	public $domain_uuid;
+
+	// like FusionPBX: the user and domain come from the parameters, else from the session
+	public function __construct(array $params = array()) {
+		$this->user_uuid = !empty($params['user_uuid']) ? $params['user_uuid'] : ($_SESSION['user_uuid'] ?? null);
+		$this->domain_uuid = !empty($params['domain_uuid']) ? $params['domain_uuid'] : ($_SESSION['domain_uuid'] ?? null);
+	}
+
+	// FusionPBX 5.6.5 database::new(): one shared instance, whose user and domain
+	// are updated from the parameters, else the session, on every call
+	public static function new(array $params = array()) {
+		if (self::$instance === null) {
+			self::$instance = new database($params);
+		}
+		if (!empty($params['user_uuid'])) {
+			self::$instance->user_uuid = $params['user_uuid'];
+		} elseif (!empty($_SESSION['user_uuid'])) {
+			self::$instance->user_uuid = $_SESSION['user_uuid'];
+		}
+		if (!empty($params['domain_uuid'])) {
+			self::$instance->domain_uuid = $params['domain_uuid'];
+		} elseif (!empty($_SESSION['domain_uuid'])) {
+			self::$instance->domain_uuid = $_SESSION['domain_uuid'];
+		}
+		return self::$instance;
+	}
 
 	public function select(string $sql, ?array $parameters = array(), string $return_type = 'all') {
 		return fake_sql($sql, $parameters, $return_type);
@@ -190,8 +270,10 @@ class database {
 	}
 
 	/**
-	 * Like FusionPBX's save(): every record needs the "<singular>_add" permission,
-	 * and it returns false when the database rejects the records (simulated by save_fails).
+	 * Like FusionPBX 5.6.5's save(): a record whose table lacks the "<singular>_add"
+	 * permission is skipped without an error (its table is added to "skipped" so
+	 * tests can see it), saved records get insert_user from this object, and it
+	 * returns false when the database rejects the records (simulated by save_fails).
 	 * Records are stored in v_<table>, nested child records in their own tables.
 	 */
 	public function save(array $array) {
@@ -214,17 +296,23 @@ class database {
 		if (FakeStore::read()['save_fails']) {
 			return false;
 		}
+		$allowed = array();
+		$skipped = array();
 		foreach ($records as $record) {
-			if (!permission_exists(rtrim($record[0], 's').'_add')) {
-				return false;
+			if (permission_exists(rtrim($record[0], 's').'_add')) {
+				$record[1]['insert_user'] = $this->user_uuid;
+				$allowed[] = $record;
+			} else {
+				$skipped[] = $record[0];
 			}
 		}
 
-		FakeStore::update(function (&$state) use ($records, $array) {
+		FakeStore::update(function (&$state) use ($allowed, $skipped, $array) {
 			$state['saved'][] = array('app_uuid' => $this->app_uuid, 'array' => $array);
-			foreach ($records as $record) {
+			foreach ($allowed as $record) {
 				$state['tables']['v_'.$record[0]][] = $record[1];
 			}
+			$state['skipped'] = array_merge($state['skipped'], $skipped);
 		});
 		return true;
 	}
@@ -272,12 +360,86 @@ function generate_password(int $length = 20, int $strength = 3): string {
 	return $password;
 }
 
+/**
+ * FusionPBX 5.6.5's permissions class: a singleton holding the permissions of
+ * the session, or else of the user's groups, as they were when it was created.
+ */
+class permissions {
+	private static $permission = null;
+	private $permissions = array();
+
+	public function __construct($database = null, $domain_uuid = null, $user_uuid = null) {
+		$domain_uuid = is_uuid($domain_uuid) ? $domain_uuid : ($_SESSION['domain_uuid'] ?? null);
+		$user_uuid = is_uuid($user_uuid) ? $user_uuid : ($_SESSION['user_uuid'] ?? null);
+		if (isset($_SESSION['permissions'])) {
+			$this->permissions = $_SESSION['permissions'];
+			return;
+		}
+		$group_names = array_column((new groups($database, $domain_uuid, $user_uuid))->assigned(), 'group_name');
+		foreach (FakeStore::read()['tables']['v_group_permissions'] ?? array() as $row) {
+			if (in_array($row['group_name'], $group_names, true)
+				&& ($row['domain_uuid'] === null || $row['domain_uuid'] === $domain_uuid)
+				&& $row['permission_assigned'] === 'true') {
+				$this->permissions[$row['permission_name']] = 1;
+			}
+		}
+	}
+
+	public static function new($database = null, $domain_uuid = null, $user_uuid = null) {
+		if (self::$permission === null) {
+			self::$permission = new permissions($database, $domain_uuid, $user_uuid);
+		}
+		return self::$permission;
+	}
+
+	public function exists($permission_name) {
+		return !empty($permission_name) && isset($this->permissions[$permission_name]);
+	}
+
+	public function session() {
+		foreach ($this->permissions as $permission_name => $row) {
+			$_SESSION['permissions'][$permission_name] = true;
+			$_SESSION['user']['permissions'][$permission_name] = true;
+		}
+	}
+}
+
+// FusionPBX 5.6.5: the user's groups (v_user_groups rows here carry group_name directly)
+class groups {
+	private $groups = array();
+
+	public function __construct($database = null, $domain_uuid = null, $user_uuid = null) {
+		if (is_uuid($domain_uuid) && is_uuid($user_uuid)) {
+			foreach (FakeStore::read()['tables']['v_user_groups'] ?? array() as $row) {
+				if ($row['domain_uuid'] === $domain_uuid && $row['user_uuid'] === $user_uuid) {
+					$this->groups[] = $row;
+				}
+			}
+		}
+	}
+
+	public function assigned() {
+		return $this->groups;
+	}
+
+	public function session() {
+		$_SESSION['groups'] = $this->groups;
+		$_SESSION['user']['groups'] = $this->groups;
+	}
+}
+
 function permission_exists($permission_name) {
-	return !empty($_SESSION['permissions'][$permission_name]);
+	global $database, $domain_uuid, $user_uuid;
+	return permissions::new($database, $domain_uuid, $user_uuid)->exists($permission_name);
 }
 
 function if_group($group) {
-	return in_array($group, $_SESSION['groups'] ?? array(), true);
+	foreach ($_SESSION['groups'] ?? array() as $row) {
+		if (($row['group_name'] ?? null) === $group) {
+			return true;
+		}
+	}
+	return false;
 }
 
 function event_socket_create($host = null, $port = null, $password = null) {

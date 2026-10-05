@@ -14,7 +14,7 @@ abstract class SessionIsolationTestCase extends RestApiTestCase
 	protected static function extraFiles(): array
 	{
 		return array(
-			'app/rest_api/actions/test-session.php' => '<?php $required_params = array(); function do_action($body) { return array("user_uuid" => $_SESSION["user_uuid"] ?? null, "permissions" => array_keys($_SESSION["permissions"] ?? array())); }',
+			'app/rest_api/actions/test-session.php' => '<?php $required_params = array(); $required_permissions = array(); function do_action($body) { return array("user_uuid" => $_SESSION["user_uuid"] ?? null, "permissions" => array_keys($_SESSION["permissions"] ?? array())); }',
 		);
 	}
 
@@ -34,14 +34,15 @@ abstract class SessionIsolationTestCase extends RestApiTestCase
 		return $this->api($body, self::KEY_ID.':'.self::SECRET, array('Cookie' => 'PHPSESSID='.self::SESSION_ID));
 	}
 
-	public function testActionsDoNotSeeTheBrowserSession(): void
+	public function testActionsSeeTheKeysUserNotTheBrowserSession(): void
 	{
 		$response = $this->apiWithBrowserSession(array('action' => 'test-session'));
 
-		$this->assertSame(array('user_uuid' => null, 'permissions' => array()), $this->json($response));
+		$this->assertSame(self::USER_UUID, $this->json($response)['user_uuid']);
+		$this->assertEqualsCanonicalizing(self::ACTION_PERMISSIONS, $this->json($response)['permissions']);
 	}
 
-	public function testPermissionsGrantedByAnActionDoNotReachTheBrowserSession(): void
+	public function testCreatingRecordsDoesNotChangeTheBrowserSession(): void
 	{
 		$response = $this->apiWithBrowserSession(array('action' => 'destination-create', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'number' => '5551234', 'extension' => '100'));
 

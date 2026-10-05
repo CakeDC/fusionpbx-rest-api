@@ -1,5 +1,6 @@
 <?php
-$required_params = array("domain_uuid", "name", "extension", "destinations", "strategy");
+$required_params = array("name", "extension", "destinations", "strategy");
+$required_permissions = array("ring_group_add", "ring_group_destination_add", "dialplan_add");
 
 function do_action($body) {
     if(!is_string($body->name)) {
@@ -105,10 +106,6 @@ function do_action($body) {
         "app_uuid" => "1d61fb65-1eec-bc73-a6ee-a6203b4fe6f2" // ring group app
     );
 
-    $_SESSION["permissions"]["ring_group_add"] = true;
-    $_SESSION["permissions"]["ring_group_destination_add"] = true;
-    $_SESSION["permissions"]["dialplan_add"] = true;
-
     $database = new database;
     $database->app_name = 'rest_api';
     $database->app_uuid = '2bfe71d9-e112-4b8b-bcff-75aeb0e06302';
@@ -116,9 +113,11 @@ function do_action($body) {
         return array("error" => "error adding ring group");
     }
 
-    $sql = "SELECT * FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
     $parameters['ring_group_uuid'] = $ring_group_uuid;
     $database = new database;
+    $sql = "SELECT ".implode(", ", REST_API_RING_GROUP_FIELDS)." FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
     $ring_group = $database->select($sql, $parameters, 'row');
+    $sql = "SELECT ".implode(", ", REST_API_RING_GROUP_DESTINATION_FIELDS)." FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
+    $ring_group['ring_group_destinations'] = $database->select($sql, $parameters, 'all');
     return $ring_group;
 }

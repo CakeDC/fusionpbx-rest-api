@@ -10,16 +10,33 @@ use PHPUnit\Framework\TestCase;
  */
 abstract class ActionTestCase extends TestCase
 {
+	protected const DOMAIN_UUID = 'aaaaaaaa-0000-4000-8000-000000000001';
+
 	/** Action file name without extension, e.g. "originate". */
 	abstract protected function action(): string;
+
+	/** Permissions the action declares. setUp() grants exactly these. */
+	protected array $requiredPermissions = array();
 
 	protected function setUp(): void
 	{
 		require_once FUSIONPBX_FAKES_DIR.'/resources/fakes.php';
 		require_once PLUGIN_DIR.'/lib/input_validation.php';
+		require_once PLUGIN_DIR.'/lib/fields.php';
 		$_SESSION = array();
 		FakeStore::reset($this->tables());
 		require PLUGIN_DIR.'/actions/'.$this->action().'.php';
+		$this->requiredPermissions = $required_permissions ?? array();
+		$this->grantOnly($this->requiredPermissions);
+	}
+
+	/**
+	 * Give the user exactly these permissions. FusionPBX keeps the permissions
+	 * of the first check, so call this before running the action.
+	 */
+	protected function grantOnly(array $permissions): void
+	{
+		$_SESSION['permissions'] = array_fill_keys($permissions, true);
 	}
 
 	/** Initial table rows, keyed by table name. */
@@ -33,9 +50,14 @@ abstract class ActionTestCase extends TestCase
 		);
 	}
 
-	protected function runAction(array $body)
+	/** Run the action as rest.php does, with the context from rest_api_resolve_domain(). */
+	protected function runAction(array $body, array $context = array())
 	{
-		return do_action((object)$body);
+		return do_action((object)$body, $context + array(
+			'domain_explicit' => true,
+			'cross_domain' => false,
+			'user_domain_uuid' => self::DOMAIN_UUID,
+		));
 	}
 
 	/** Make the next database save() fail, as FusionPBX's does on a database error. */

@@ -35,7 +35,7 @@ class RingGroupCreateTest extends ActionTestCase
 
 	public function testCreatesTheRingGroupWithItsDestinationsAndDialplan(): void
 	{
-		$this->runAction($this->body());
+		$result = $this->runAction($this->body());
 
 		$tables = $this->state()['tables'];
 		$ring_group = $tables['v_ring_groups'][1];
@@ -45,6 +45,10 @@ class RingGroupCreateTest extends ActionTestCase
 		$this->assertSame(array('100', '101'), array_column($tables['v_ring_group_destinations'], 'destination_number'));
 		$this->assertSame('tenant1.example.com', $tables['v_dialplans'][0]['dialplan_context']);
 		$this->assertStringContainsString('<condition field="destination_number" expression="^200$">', $tables['v_dialplans'][0]['dialplan_xml']);
+		$this->assertSame(array_merge(REST_API_RING_GROUP_FIELDS, array('ring_group_destinations')), array_keys($result));
+		$this->assertSame(array('100', '101'), array_column($result['ring_group_destinations'], 'destination_number'));
+		$this->assertSame(REST_API_RING_GROUP_DESTINATION_FIELDS, array_keys($result['ring_group_destinations'][0]));
+		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
 	}
 
 	public function testEscapesTheNameInTheDialplanXml(): void

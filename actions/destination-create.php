@@ -1,5 +1,6 @@
 <?php
-$required_params = array("domain_uuid", "number", "extension");
+$required_params = array("number", "extension");
+$required_permissions = array("destination_add", "dialplan_add", "dialplan_detail_add");
 
 function do_action($body) {
     // number is used in dialplan regular expressions, so digits only (a "."
@@ -105,10 +106,6 @@ function do_action($body) {
         )
     );
 
-    $_SESSION["permissions"]["dialplan_detail_add"] = true;
-    $_SESSION["permissions"]["dialplan_add"] = true;
-    $_SESSION["permissions"]["destination_add"] = true;
-
     $database = new database;
     $database->app_name = 'rest_api';
     $database->app_uuid = '2bfe71d9-e112-4b8b-bcff-75aeb0e06302';
@@ -116,9 +113,8 @@ function do_action($body) {
         return array("error" => "error adding destination");
     }
 
-    $sql = "SELECT * FROM v_destinations WHERE destination_uuid = :destination_uuid";
+    $sql = "SELECT ".implode(", ", REST_API_DESTINATION_FIELDS)." FROM v_destinations WHERE destination_uuid = :destination_uuid";
     $parameters['destination_uuid'] = $destination_uuid;
     $database = new database;
-    $extension = $database->select($sql, $parameters, 'row');
-    return $extension;
+    return rest_api_decode_destination($database->select($sql, $parameters, 'row'));
 }

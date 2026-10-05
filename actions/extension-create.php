@@ -1,5 +1,6 @@
 <?php
-$required_params = array("domain_uuid", "extension");
+$required_params = array("extension");
+$required_permissions = array("extension_add", "voicemail_add");
 function do_action($body) {    
     $caller_id_name = "";
     if(!empty($body->caller_id_name)) {
@@ -84,9 +85,6 @@ function do_action($body) {
         "voicemail_description" => ""
     );
 
-    $_SESSION["permissions"]["extension_add"] = true;
-    $_SESSION["permissions"]["voicemail_add"] = true;
-
     $database = new database;
     $database->app_name = 'rest_api';
     $database->app_uuid = '2bfe71d9-e112-4b8b-bcff-75aeb0e06302';
@@ -94,8 +92,15 @@ function do_action($body) {
         return array("error" => "error adding extension");
     }
 
-    $sql = "SELECT * FROM v_extensions WHERE extension_uuid = :extension_uuid";
+    $sql = "SELECT ".implode(", ", REST_API_EXTENSION_FIELDS)." FROM v_extensions WHERE extension_uuid = :extension_uuid";
     $parameters['extension_uuid'] = $extension_uuid;
     $database = new database;
-    return $database->select($sql, $parameters, 'row');
+    $extension = $database->select($sql, $parameters, 'row');
+    // the SIP password lets an integration provision the phone. FusionPBX only
+    // shows it to users with extension_password, so the API does the same
+    if($extension && permission_exists('extension_password')) {
+        $sql = "SELECT password FROM v_extensions WHERE extension_uuid = :extension_uuid";
+        $extension['password'] = $database->select($sql, $parameters, 'column');
+    }
+    return $extension;
 }
