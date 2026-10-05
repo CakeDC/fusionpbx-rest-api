@@ -118,3 +118,36 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 | `domain_uuid`      | yes      | domain to list call detail records from |
 
 returns the the last 100 call detail records.
+
+# Development
+
+## Tests
+The tests need PHP 8.3 or newer and [Composer](https://getcomposer.org/). They don't need FusionPBX: `tests/Support/fusionpbx/` provides stand-ins for the FusionPBX functions and classes the plugin uses, including a small in-memory database.
+
+```
+composer install
+composer test
+```
+
+* `tests/Unit`: the `lib/` helpers and every action, each test in its own PHP process.
+* `tests/Http`: `rest.php` and the key management pages, served by PHP's built-in web server from a temporary FusionPBX-like document root.
+
+To check that the tests catch a regression, run them against another checkout of the plugin, for example an older commit:
+
+```
+git worktree add /tmp/rest_api_old <commit>
+PLUGIN_DIR=/tmp/rest_api_old composer test
+```
+
+## Coverage
+`composer coverage` runs the suite with [Xdebug](https://xdebug.org/) in coverage mode and writes an HTML report to `build/coverage/html/index.html`. It merges the unit tests' coverage with the lines run by requests to the HTTP test server, so `rest.php`, `index.php` and `key_edit.php` are included.
+
+Xdebug must be installed (e.g. `sudo apt install php8.5-xdebug`). The script turns on coverage mode itself. Without Xdebug locally, use a Docker image that has it, e.g. a ddev web image:
+
+```
+docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -v $PWD:/app -w /app --entrypoint bash ddev/ddev-webserver:<tag> -c '
+  mkdir -p /tmp/ini && printf "zend_extension=xdebug\nopcache.enable_cli=0\n" > /tmp/ini/xdebug.ini
+  PHP_INI_SCAN_DIR=":/tmp/ini" XDEBUG_MODE=coverage composer coverage'
+```
+
+The test stand-ins refuse to run when requested through a web server outside the test suite, but `vendor/` and `tests/` don't need to be deployed to FusionPBX.

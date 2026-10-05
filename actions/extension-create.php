@@ -2,12 +2,12 @@
 $required_params = array("domain_uuid", "extension");
 function do_action($body) {    
     $caller_id_name = "";
-    if($body->caller_id_name) {
+    if(!empty($body->caller_id_name)) {
         $caller_id_name = $body->caller_id_name;
     }
 
     $caller_id_number = "";
-    if($body->caller_id_number) {
+    if(!empty($body->caller_id_number)) {
         $caller_id_number = $body->caller_id_number;
     }
 
