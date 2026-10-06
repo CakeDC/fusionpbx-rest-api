@@ -159,3 +159,9 @@ function rest_api_format_cdr($cdr) {
     }
     return $cdr;
 }
+
+// enabled is "true"/"false" text, or a boolean when the column is one
+function rest_api_format_user_extension($extension) {
+    $extension['enabled'] = in_array($extension['enabled'], array(true, 1, "1", "t", "true"), true);
+    return $extension;
+}

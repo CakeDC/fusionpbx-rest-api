@@ -160,9 +160,9 @@ List number, UUID and a few other details of all extensions on a given domain.
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 | `user_uuid`   | yes | FusionPBX user whose extensions to list |
 
-List the extensions linked to a user (`v_extension_users`), sorted by extension number (as text), disabled ones included. A user can have several extensions; FusionPBX has no primary one, so the caller picks. Each item has `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (`"true"`/`"false"`) and `user_uuid`.
+List the extensions linked to a user (`v_extension_users`), sorted by extension number (as text), disabled ones included, each once even if linked twice. A user can have several extensions; FusionPBX has no primary one, so the caller picks. Returns `{"data": [...]}` (ZuluCall's `listUserExtensions`). Each item has `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`.
 
-A user without extensions returns `[]`. A user that is not in the domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
+A user without extensions returns `{"data": []}`. A user that is not in the domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
 
 
 ## `ringgroup-create`

@@ -144,6 +144,30 @@ class FakesTest extends TestCase
 
 		$this->assertSame(array('c', 'b', 'a'), array_column($rows, 'username'));
 	}
+
+	// DISTINCT compares the selected columns and runs before LIMIT/OFFSET
+	public function testSelectDistinctDropsDuplicateRowsBeforePaging(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_users'] = array(
+				array('username' => 'a', 'domain_uuid' => '1'),
+				array('username' => 'a', 'domain_uuid' => '2'),
+				array('username' => 'b', 'domain_uuid' => '1'),
+			);
+		});
+
+		$rows = fake_sql("SELECT DISTINCT u.username FROM v_users u ORDER BY u.username LIMIT 1 OFFSET 1", null);
+
+		$this->assertSame(array('b'), array_column($rows, 'username'));
+	}
+
+	// Postgres: "for SELECT DISTINCT, ORDER BY expressions must appear in select list"
+	public function testSelectDistinctRejectsOrderingByAnUnselectedColumn(): void
+	{
+		$this->expectException(\RuntimeException::class);
+
+		fake_sql("SELECT DISTINCT u.username FROM v_users u ORDER BY u.domain_uuid", null);
+	}
 	private function seedCalls(): void
 	{
 		FakeStore::update(function (&$state) {

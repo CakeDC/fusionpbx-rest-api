@@ -139,20 +139,24 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 	return FakeStore::update(function (&$state) use ($sql, $parameters, $return_type, $value, $where, $from) {
 		$state['queries'][] = array('sql' => $sql, 'parameters' => $parameters);
 
-		if (preg_match('/^select (.+?) from (.+?)(?: where (.+?))?(?: order by (.+?))?(?: limit (\d+))?(?: offset (\d+))?$/i', $sql, $m)) {
-			list($rows, $aliases) = $from($m[2], $state['tables']);
-			if (!empty($m[3])) {
-				$rows = array_values(array_filter($rows, $where($m[3], $state['tables'], $aliases)));
-			}
-			if (preg_match('/^count\(\*\)$/i', trim($m[1]))) {
-				$rows = array(array('count' => count($rows)));
-				$m[1] = 'count';
-			}
+		if (preg_match('/^select (distinct )?(.+?) from (.+?)(?: where (.+?))?(?: order by (.+?))?(?: limit (\d+))?(?: offset (\d+))?$/i', $sql, $m)) {
+			list($rows, $aliases) = $from($m[3], $state['tables']);
 			if (!empty($m[4])) {
+				$rows = array_values(array_filter($rows, $where($m[4], $state['tables'], $aliases)));
+			}
+			if (preg_match('/^count\(\*\)$/i', trim($m[2]))) {
+				$rows = array(array('count' => count($rows)));
+				$m[2] = 'count';
+			}
+			if (!empty($m[5])) {
 				$order = array();
-				foreach (explode(',', $m[4]) as $part) {
+				foreach (explode(',', $m[5]) as $part) {
 					if (!preg_match('/^([\w.]+)(?: (asc|desc))?$/i', trim($part), $o)) {
 						throw new RuntimeException("unsupported SQL order: ".$part);
+					}
+					// Postgres: "for SELECT DISTINCT, ORDER BY expressions must appear in select list"
+					if (!empty($m[1]) && !in_array($o[1], array_map('trim', explode(',', $m[2])), true)) {
+						throw new RuntimeException("ORDER BY ".$o[1]." is not in the SELECT DISTINCT list");
 					}
 					$order[] = array($o[1], strcasecmp($o[2] ?? '', 'desc') === 0 ? -1 : 1);
 				}
@@ -166,15 +170,12 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 					return 0;
 				});
 			}
-			if (!empty($m[5]) || !empty($m[6])) {
-				$rows = array_slice($rows, (int)($m[6] ?? 0), !empty($m[5]) ? (int)$m[5] : null);
-			}
-			if (trim($m[1]) === '*') {
+			if (trim($m[2]) === '*') {
 				$rows = array_map(function ($row) {
 					return array_filter($row, function ($column) { return strpos($column, '.') === false; }, ARRAY_FILTER_USE_KEY);
 				}, $rows);
 			} else {
-				$columns = array_map('trim', explode(',', $m[1]));
+				$columns = array_map('trim', explode(',', $m[2]));
 				$rows = array_map(function ($row) use ($columns) {
 					$out = array();
 					foreach ($columns as $c) {
@@ -182,6 +183,13 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 					}
 					return $out;
 				}, $rows);
+			}
+			// DISTINCT applies to the selected columns, before LIMIT/OFFSET
+			if (!empty($m[1])) {
+				$rows = array_values(array_unique($rows, SORT_REGULAR));
+			}
+			if (!empty($m[6]) || !empty($m[7])) {
+				$rows = array_slice($rows, (int)($m[7] ?? 0), !empty($m[6]) ? (int)$m[6] : null);
 			}
 			switch ($return_type) {
 				case 'row':

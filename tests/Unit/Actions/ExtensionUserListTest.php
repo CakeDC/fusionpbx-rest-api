@@ -46,7 +46,7 @@ class ExtensionUserListTest extends ActionTestCase
 	{
 		$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => self::AGENT));
 
-		$this->assertSame(array(
+		$this->assertSame(array('data' => array(
 			array(
 				'extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000101',
 				'extension' => '101',
@@ -55,7 +55,7 @@ class ExtensionUserListTest extends ActionTestCase
 				'directory_last_name' => 'Ruiz',
 				'emergency_caller_id_number' => '911',
 				'outbound_caller_id_number' => '+15551230101',
-				'enabled' => 'true',
+				'enabled' => true,
 				'user_uuid' => self::AGENT,
 			),
 			array(
@@ -66,17 +66,17 @@ class ExtensionUserListTest extends ActionTestCase
 				'directory_last_name' => 'Ruiz',
 				'emergency_caller_id_number' => '911',
 				'outbound_caller_id_number' => '+15551230102',
-				'enabled' => 'false',
+				'enabled' => false,
 				'user_uuid' => self::AGENT,
 			),
-		), $result);
+		)), $result);
 	}
 
 	public function testReturnsAnEmptyListForAUserWithoutExtensions(): void
 	{
 		$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => self::AGENT_WITHOUT_EXTENSION));
 
-		$this->assertSame(array(), $result);
+		$this->assertSame(array('data' => array()), $result);
 	}
 
 	public function testDoesNotFindAUserOfAnotherDomain(): void
@@ -112,6 +112,41 @@ class ExtensionUserListTest extends ActionTestCase
 
 		$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => self::AGENT_WITHOUT_EXTENSION));
 
-		$this->assertSame(array(), $result);
+		$this->assertSame(array('data' => array()), $result);
+	}
+
+	// v_extension_users has no unique (user, extension) constraint
+	public function testReturnsAnExtensionLinkedTwiceOnce(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_extension_users'][] = array('extension_user_uuid' => 'ffffffff-0000-4000-8000-000000000006', 'domain_uuid' => self::DOMAIN_UUID, 'extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000101', 'user_uuid' => self::AGENT);
+		});
+
+		$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => self::AGENT));
+
+		$this->assertSame(array('101', '102'), array_column($result['data'], 'extension'));
+	}
+
+	public function testAnswersServerErrorWhenTheDatabaseFails(): void
+	{
+		$this->failSelects();
+
+		$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => self::AGENT));
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $result);
+	}
+
+	// the contract's enabled is a boolean, whether the column is text or boolean
+	public function testReturnsEnabledAsABoolean(): void
+	{
+		foreach (array(array('true', true), array('false', false), array('t', true), array('f', false), array(true, true), array(false, false), array(null, false)) as list($stored, $enabled)) {
+			\FakeStore::update(function (&$state) use ($stored) {
+				$state['tables']['v_extensions'][1]['enabled'] = $stored;
+			});
+
+			$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => self::AGENT));
+
+			$this->assertSame($enabled, $result['data'][0]['enabled'], var_export($stored, true));
+		}
 	}
 }
