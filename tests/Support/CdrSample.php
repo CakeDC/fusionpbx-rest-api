@@ -74,7 +74,8 @@ final class CdrSample
 
 	private static function leg(string $uuid, string $leg, string $start, array $columns): array
 	{
-		$end = (new \DateTimeImmutable($start))->modify('+1 minute')->format('Y-m-d H:i:sP');
+		// as Postgres prints a timestamptz in UTC
+		$end = (new \DateTimeImmutable($start))->modify('+1 minute')->format('Y-m-d H:i:s').'+00';
 		return array_merge(array(
 			'xml_cdr_uuid' => $uuid,
 			'domain_uuid' => self::DOMAIN_UUID,

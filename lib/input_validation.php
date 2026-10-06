@@ -90,7 +90,8 @@ function rest_api_parse_timestamp($value) {
     return array($date->setTimezone($utc), !isset($m[4]));
 }
 
-// a literal text for LIKE ... ESCAPE '\': no wildcards
+// a literal text for LIKE ... ESCAPE '!': no wildcards. not ESCAPE '\': PDO
+// before PHP 8.4 reads '\' as an escaped quote and misses the placeholders after it
 function rest_api_like_escape($value) {
-    return str_replace(array("\\", "%", "_"), array("\\\\", "\\%", "\\_"), $value);
+    return str_replace(array("!", "%", "_"), array("!!", "!%", "!_"), $value);
 }

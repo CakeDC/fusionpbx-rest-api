@@ -272,6 +272,15 @@ composer test
 * `tests/Unit`: the `lib/` helpers and every action, each test in its own PHP process.
 * `tests/Http`: `rest.php` and the key management pages, served by PHP's built-in web server from a temporary FusionPBX-like document root.
 
+The in-memory database only shows that the plugin's SQL does what it should, not that PostgreSQL accepts it. The `pgsql` suite (`tests/Pgsql`) runs the `cdr-search` and `cdr-details` tests, and the App Defaults index, on a real PostgreSQL with FusionPBX 5.6.5's `v_xml_cdr` columns, through PDO the way FusionPBX's `database` class uses it. It needs Docker:
+
+```
+composer test-pgsql                         # PostgreSQL 18 (the FusionPBX installer's default), PHP 8.3
+POSTGRES_VERSION=16 PHP_VERSION=8.4 composer test-pgsql
+```
+
+To use a PostgreSQL of your own, set `REST_API_PGSQL_DSN` (e.g. `pgsql:host=127.0.0.1 port=5432 dbname=test user=test password=test`) and run `vendor/bin/phpunit --testsuite pgsql`; PHP needs `pdo_pgsql`. The suite creates and empties `v_xml_cdr` and creates `v_xml_cdr_originating_leg_uuid_idx`, so never point it at a FusionPBX database.
+
 To check that the tests catch a regression, run them against another checkout of the plugin, for example an older commit:
 
 ```

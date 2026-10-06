@@ -14,6 +14,7 @@
     },
     "scripts": {
         "test": "phpunit",
+        "test-pgsql": "docker compose -f tests/Pgsql/compose.yaml run --rm --build --user \"$(id -u):$(id -g)\" php; status=$?; docker compose -f tests/Pgsql/compose.yaml down; exit $status",
         "coverage": [
             "rm -rf build/coverage && mkdir -p build/coverage/raw",
             "@putenv COVERAGE_DIR=build/coverage/raw",
@@ -28,6 +29,7 @@
     },
     "scripts-descriptions": {
         "test": "Run the test suite",
+        "test-pgsql": "Run the pgsql suite (CDR SQL and the App Defaults index) on PostgreSQL in Docker",
         "coverage": "Run the tests with code coverage (needs Xdebug) and write an HTML report to build/coverage/html"
     }
 }

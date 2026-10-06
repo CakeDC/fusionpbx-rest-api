@@ -70,7 +70,10 @@ function fake_sql(string $sql, ?array $parameters, string $return_type = 'all') 
 	$parameters = $parameters ?? array();
 	$sql = trim(preg_replace('/\s+/', ' ', $sql));
 
-	preg_match_all('/:(\w+)/', $sql, $matches);
+	// placeholders outside string literals, found like PDO before PHP 8.4 (as
+	// on Debian 12): a backslash escapes the next character, so '\' doesn't end
+	// the literal and hides the placeholders after it
+	preg_match_all('/:(\w+)/', preg_replace("/'(?:[^'\\\\]|\\\\.)*'/s", "''", $sql), $matches);
 	$placeholders = array_unique($matches[1]);
 	$missing = array_diff($placeholders, array_keys($parameters));
 	$unused = array_diff(array_keys($parameters), $placeholders);
@@ -600,6 +603,8 @@ function fake_sql_like(string $value, string $pattern, string $escape): bool {
 
 class database {
 	private static $instance = null;
+	// FusionPBX's default database type
+	public $type = 'pgsql';
 	public $app_name;
 	public $app_uuid;
 	public $user_uuid;
@@ -630,15 +635,25 @@ class database {
 		return self::$instance;
 	}
 
+	// when set, queries run on a real PostgreSQL instead of fake_sql()
+	// (RestApi\Test\Support\Pgsql, used by the pgsql test suite)
+	public static $pgsql = null;
+
 	// like FusionPBX 5.6.5, a database error returns false (simulated by select_fails)
 	public function select(string $sql, ?array $parameters = array(), string $return_type = 'all') {
 		if (FakeStore::read()['select_fails'] ?? false) {
 			return false;
 		}
+		if (self::$pgsql) {
+			return self::$pgsql->select($sql, $parameters, $return_type);
+		}
 		return fake_sql($sql, $parameters, $return_type);
 	}
 
 	public function execute(string $sql, ?array $parameters = array()) {
+		if (self::$pgsql) {
+			return self::$pgsql->execute($sql, $parameters);
+		}
 		return fake_sql($sql, $parameters);
 	}
 

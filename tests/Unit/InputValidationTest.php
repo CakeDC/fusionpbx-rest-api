@@ -128,6 +128,6 @@ class InputValidationTest extends TestCase
 
 	public function testLikeEscapeMakesWildcardsLiteral(): void
 	{
-		$this->assertSame('100\\%\\_\\\\', rest_api_like_escape('100%_\\'));
+		$this->assertSame('100!%!_!!\\', rest_api_like_escape('100%_!\\'));
 	}
 }

@@ -215,8 +215,19 @@ class FakesTest extends TestCase
 		$this->seedCalls();
 
 		$this->assertSame(array('a1', 'b1'), $this->select("c.number LIKE '10_%'"));
-		$this->assertSame(array('a1'), $this->select("c.number LIKE :pattern ESCAPE '\\'", array('pattern' => '%0\\%')));
-		$this->assertSame(array(), $this->select("c.number LIKE '%\\_%' ESCAPE '\\'"));
+		$this->assertSame(array('a1'), $this->select("c.number LIKE :pattern ESCAPE '!'", array('pattern' => '%0!%')));
+		$this->assertSame(array(), $this->select("c.number LIKE '%!_%' ESCAPE '!'"));
+	}
+
+	// PDO before PHP 8.4 reads '\' as an escaped quote, so the literal goes on
+	// and swallows the placeholders after it: SQLSTATE[HY093]
+	public function testPlaceholdersAfterABackslashLiteralAreNotSeen(): void
+	{
+		$this->seedCalls();
+
+		$this->expectExceptionMessage('SQL parameter mismatch (missing: ; unused: b)');
+
+		$this->select("(c.number LIKE :a ESCAPE '\\' OR c.number LIKE :b ESCAPE '\\')", array('a' => '1%', 'b' => '1%'));
 	}
 
 	public function testWhereComparesTimestampsAsInstants(): void

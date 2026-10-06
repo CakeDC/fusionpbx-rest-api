@@ -104,8 +104,8 @@ function do_action($body) {
             return array("error" => "invalid counterparty", "code" => 400);
         }
         $like = "%".rest_api_like_escape($body->counterparty)."%";
-        $caller_matches = "c.caller_id_number LIKE ".$bind($like)." ESCAPE '\\'";
-        $destination_matches = "c.destination_number LIKE ".$bind($like)." ESCAPE '\\'";
+        $caller_matches = "c.caller_id_number LIKE ".$bind($like)." ESCAPE '!'";
+        $destination_matches = "c.destination_number LIKE ".$bind($like)." ESCAPE '!'";
         if(isset($body->own_number)) {
             $own = rest_api_parse_list($body->own_number);
             if($own === false) {
@@ -124,7 +124,7 @@ function do_action($body) {
                 .$in_own("c.caller_id_number")." AND ".$destination_matches.") OR ("
                 .$not_own("c.caller_id_number")." AND ".$in_own("c.destination_number")." AND ".$caller_matches.") OR ("
                 .$not_own("c.caller_id_number")." AND ".$not_own("c.destination_number")
-                ." AND (c.caller_id_number LIKE ".$bind($like)." ESCAPE '\\' OR c.destination_number LIKE ".$bind($like)." ESCAPE '\\')))";
+                ." AND (c.caller_id_number LIKE ".$bind($like)." ESCAPE '!' OR c.destination_number LIKE ".$bind($like)." ESCAPE '!')))";
         } else {
             $where[] = "(".$caller_matches." OR ".$destination_matches.")";
         }
