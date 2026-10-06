@@ -14,7 +14,9 @@ use PHPUnit\Framework\TestCase;
 class ActionDeclarationsTest extends TestCase
 {
 	private const PERMISSIONS = array(
+		'cdr-details' => array('xml_cdr_view'),
 		'cdr-list' => array('xml_cdr_view'),
+		'cdr-search' => array('xml_cdr_view'),
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
 		'destination-details' => array('destination_view'),
 		'domain-details' => array(),
