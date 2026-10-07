@@ -27,6 +27,7 @@ class ActionDeclarationsTest extends TestCase
 		'extension-user-list' => array('extension_view', 'user_view'),
 		'originate' => array('click_to_call_call'),
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
+		'user-list' => array('user_view'),
 	);
 
 	public static function actions(): array

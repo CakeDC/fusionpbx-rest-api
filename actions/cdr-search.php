@@ -24,14 +24,11 @@ function do_action($body) {
     if($calls_only === null) {
         return array("error" => "invalid calls_only", "code" => 400);
     }
-    $page = isset($body->page) ? rest_api_parse_int($body->page, 1, 1000000) : 1;
-    if($page === false) {
-        return array("error" => "invalid page", "code" => 400);
+    $pagination = rest_api_parse_pagination($body);
+    if(isset($pagination["error"])) {
+        return $pagination;
     }
-    $per_page = isset($body->per_page) ? rest_api_parse_int($body->per_page, 1, 200) : 25;
-    if($per_page === false) {
-        return array("error" => "invalid per_page", "code" => 400);
-    }
+    list($page, $per_page) = $pagination;
     $sorts = array("-start_stamp" => "DESC", "start_stamp" => "ASC");
     $sort = isset($body->sort) ? $body->sort : "-start_stamp";
     if(!is_string($sort) || !isset($sorts[$sort])) {

@@ -122,6 +122,14 @@ const REST_API_DOMAIN_LIST_FIELDS = array(
     "domain_enabled"
 );
 
+// ZuluCall's PbxUser (listUsers, #43970). never password, salt or api_key
+const REST_API_USER_FIELDS = array(
+    "user_uuid",
+    "domain_uuid",
+    "username",
+    "user_enabled"
+);
+
 // destination_actions is JSON-encoded in the database. return it parsed (#5)
 function rest_api_decode_destination($destination) {
     if($destination && !empty($destination['destination_actions'])) {
@@ -171,6 +179,12 @@ function rest_api_format_cdr($cdr) {
 function rest_api_format_domain($domain) {
     $domain['domain_enabled'] = in_array($domain['domain_enabled'], array(true, 1, "1", "t", "true"), true);
     return $domain;
+}
+
+// user_enabled is boolean on Postgres, text on sqlite and mysql
+function rest_api_format_user($user) {
+    $user['user_enabled'] = in_array($user['user_enabled'], array(true, 1, "1", "t", "true"), true);
+    return $user;
 }
 
 // enabled is "true"/"false" text, or a boolean when the column is one

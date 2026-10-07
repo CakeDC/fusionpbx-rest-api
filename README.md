@@ -71,6 +71,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
+| `user-list` | `user_view` |
 
 A missing permission returns `403 {"error": "forbidden", "missing_permissions": [...]}`.
 
@@ -182,6 +183,15 @@ List the extensions linked to a user (`v_extension_users`), sorted by extension 
 
 A user without extensions returns `{"data": []}`. A user that is not in the domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
 
+
+## `user-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `page`        | no | Page number, from 1 (default 1, at most 1000000) |
+| `per_page`    | no | Rows per page, 1 to 200 (default 25) |
+
+List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}` (ZuluCall's `listUsers`). Each item has `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `ringgroup-create`
 | Parameter      | Required | Description |
