@@ -4,6 +4,7 @@
          bootstrap="tests/bootstrap.php"
          cacheDirectory=".phpunit.cache"
          colors="true"
+         defaultTestSuite="unit,http"
          failOnWarning="true"
          failOnDeprecation="true"
          failOnNotice="true"
@@ -16,6 +17,10 @@
         </testsuite>
         <testsuite name="http">
             <directory>tests/Http</directory>
+        </testsuite>
+        <!-- needs PostgreSQL: composer test-pgsql -->
+        <testsuite name="pgsql">
+            <directory>tests/Pgsql</directory>
         </testsuite>
     </testsuites>
     <source>
