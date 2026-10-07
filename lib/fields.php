@@ -115,6 +115,13 @@ const REST_API_DOMAIN_FIELDS = array(
     "domain_description"
 );
 
+// ZuluCall's Domain (listDomains, #43969)
+const REST_API_DOMAIN_LIST_FIELDS = array(
+    "domain_uuid",
+    "domain_name",
+    "domain_enabled"
+);
+
 // destination_actions is JSON-encoded in the database. return it parsed (#5)
 function rest_api_decode_destination($destination) {
     if($destination && !empty($destination['destination_actions'])) {
@@ -158,6 +165,12 @@ function rest_api_format_cdr($cdr) {
         }
     }
     return $cdr;
+}
+
+// domain_enabled is boolean on Postgres, text on sqlite and mysql
+function rest_api_format_domain($domain) {
+    $domain['domain_enabled'] = in_array($domain['domain_enabled'], array(true, 1, "1", "t", "true"), true);
+    return $domain;
 }
 
 // enabled is "true"/"false" text, or a boolean when the column is one

@@ -20,6 +20,7 @@ class ActionDeclarationsTest extends TestCase
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
 		'destination-details' => array('destination_view'),
 		'domain-details' => array(),
+		'domain-list' => array('domain_view'),
 		'extension-create' => array('extension_add', 'voicemail_add'),
 		'extension-details' => array('extension_view'),
 		'extension-list' => array('extension_view'),

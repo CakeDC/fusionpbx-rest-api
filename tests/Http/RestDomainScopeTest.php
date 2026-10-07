@@ -92,6 +92,20 @@ class RestDomainScopeTest extends RestApiTestCase
 		}
 	}
 
+	// domain-list (#43969) lists other domains only for domain_select, the
+	// same rule rest.php applies to domain_uuid
+	public function testDomainListOnlyListsOtherDomainsWithDomainSelect(): void
+	{
+		$own = $this->api(array('action' => 'domain-list'));
+		$this->allowOtherDomains();
+		$all = $this->api(array('action' => 'domain-list'));
+
+		$this->assertSame(200, $own['status']);
+		$this->assertSame(array('tenant1.example.com'), array_column($this->json($own)['data'], 'domain_name'));
+		$this->assertSame(200, $all['status']);
+		$this->assertSame(array('tenant1.example.com', 'tenant2.example.com'), array_column($this->json($all)['data'], 'domain_name'));
+	}
+
 	public function testDomainDetailsReturnsTheUsersDomainByDefault(): void
 	{
 		$response = $this->api(array('action' => 'domain-details'));

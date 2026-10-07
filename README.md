@@ -64,6 +64,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `destination-create` | `destination_add`, `dialplan_add`, `dialplan_detail_add` |
 | `destination-details` | `destination_view` |
 | `domain-details` | none |
+| `domain-list` | `domain_view` (`domain_select` to see every domain) |
 | `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back) |
 | `extension-details` | `extension_view` |
 | `extension-list` | `extension_view` |
@@ -131,6 +132,15 @@ looks up details for a particular destination
 | `domain_name` | no       | Name of the domain to look up, used when `domain_uuid` is not given. |
 
 looks up details of a domain. Mostly useful for converting between domain uuid and domain name. With neither parameter it returns the key user's domain.
+
+## `domain-list`
+
+| Parameter  | Required | Description |
+|------------|----------|-------------|
+| `page`     | no | Page number, from 1 (default 1, at most 1000000) |
+| `per_page` | no | Rows per page, 1 to 200 (default 25) |
+
+List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 2}}` (ZuluCall's `listDomains`). Each item has `domain_uuid`, `domain_name` and `domain_enabled` (boolean). Users with `domain_select` get every domain, disabled ones included; other users only get their own domain. `domain_uuid` is ignored. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `extension-create`
 
