@@ -6,7 +6,7 @@ Clone a release into FusionPBX's `app/` folder, into a folder called `rest_api`:
 
 ```
 cd /var/www/fusionpbx/app
-git clone --branch v1.0.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
+git clone --branch 1.0.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
 ```
 
 Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, App Defaults, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions. App Defaults adds the index on `v_xml_cdr.originating_leg_uuid` that `cdr-search` and `cdr-details` need on PostgreSQL; on a large CDR table it can take a few minutes, without blocking new call records.)
