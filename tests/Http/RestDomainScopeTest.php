@@ -31,7 +31,7 @@ class RestDomainScopeTest extends RestApiTestCase
 
 	private function extensions(array $response): array
 	{
-		return array_column($this->json($response), 'extension');
+		return array_column($this->json($response)['data'], 'extension');
 	}
 
 	public function testActsOnTheUsersDomainByDefault(): void

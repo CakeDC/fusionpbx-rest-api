@@ -99,6 +99,9 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 ## Upgrading from earlier versions
 
+From 1.0.0:
+- `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
+
 Version 1.0.0 is the first release. Coming from the AccelerateNetworks code, or from a checkout older than 1.0.0, note that it changes how keys work:
 - After upgrading, run Advanced → Upgrade → Schema, Menu Defaults and Permission Defaults, then log out and back in (permissions are cached in the session) before editing keys. **Existing keys stop working** until a superadmin edits each one, picks a user and enables it.
 - Each integration's user needs the permissions listed above.
@@ -186,8 +189,10 @@ Each field needs the permissions of the columns it writes, as in FusionPBX's ext
 | Parameter     | Required | Description |
 |---------------|----------|-------------|
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `page`        | no | Page number, from 1 (default 1, at most 1000000) |
+| `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List number, UUID and a few other details of all extensions on a given domain.
+List the extensions of a domain, disabled ones included, sorted by extension number (as text): `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 42}}` (ZuluCall's `listExtensions`). Each item has the fields of `extension-user-list`: `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`. An extension can be linked to several users; `user_uuid` is the one with the lowest uuid, or `null` when none is linked (use `extension-user-list` for a user's extensions). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 
 ## `extension-user-list`
