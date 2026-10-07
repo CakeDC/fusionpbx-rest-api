@@ -64,6 +64,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `destination-create` | `destination_add`, `dialplan_add`, `dialplan_detail_add` |
 | `destination-details` | `destination_view` |
 | `destination-list` | `destination_view` |
+| `destination-update` | `destination_edit`, `dialplan_edit`, `dialplan_detail_add`, `dialplan_detail_delete` |
 | `domain-details` | none |
 | `domain-list` | `domain_view` (`domain_select` to see every domain) |
 | `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back, `extension_user_add` to link a user) |
@@ -151,6 +152,21 @@ FusionPBX stores a destination as actions such as `transfer 100 XML <domain>`. W
 | `extension` | an extension's number or alias | the number |
 
 Any other destination (a time condition, a call flow, a fax, several actions, a number nothing in the domain owns) has `destination_type` and `target` `null`. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+
+## `destination-update`
+| Parameter          | Required | Description |
+|--------------------|----------|-------------|
+| `domain_uuid`      | no  | Domain to act on. Defaults to the key user's domain |
+| `number`           | yes | Inbound number of the destination to update |
+| `destination_type` | no  | `extension`, `ring_group`, `ivr` or `voicemail`; given together with `target` |
+| `target`           | no  | The extension number (or alias), ring group uuid, IVR menu uuid or voicemail box number, in the domain |
+| `enabled`          | no  | `true` or `false` |
+
+Update an inbound destination (ZuluCall's `updateDestination`) and return it as `destination-list` does. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise).
+
+A new target replaces the destination's actions with one transfer to it (`<number> XML <context>`, `*99<box>` for voicemail): in the destination, in its dialplan's XML and in its dialplan details. Everything else FusionPBX put in the dialplan (recording, hold music, caller ID prefix, conditions...) stays as it is. If the dialplan no longer contains the destination's actions, because it was edited by hand, the update is refused with `409`. `enabled` switches both the destination and its dialplan. The dialplan cache is cleared as FusionPBX's destination page does.
+
+A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, a target outside the domain returns `404 {"error": "target not found"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
 
 ## `domain-details`
 

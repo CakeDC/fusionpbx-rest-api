@@ -748,6 +748,17 @@ class database {
 	}
 }
 
+// FusionPBX's settings: default settings by category and subcategory, from
+// "settings" in the store
+class settings {
+	public function __construct($setting_array = array()) {
+	}
+
+	public function get(?string $category = null, ?string $subcategory = null, $default_value = null) {
+		return FakeStore::read()['settings'][$category][$subcategory] ?? $default_value;
+	}
+}
+
 // FusionPBX's cache (memcache or files). deleted keys go to "cache_deleted"
 class cache {
 	public function delete($key) {

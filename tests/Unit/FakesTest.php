@@ -160,6 +160,18 @@ class FakesTest extends TestCase
 		$this->assertSame(array('extension_users'), $state['skipped']);
 	}
 
+	// FusionPBX's settings: default settings by category and subcategory
+	public function testSettingsReturnTheStoredValueOrTheDefault(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['settings']['switch']['voicemail'] = '/var/lib/freeswitch/storage/voicemail';
+		});
+		$settings = new \settings(array('domain_uuid' => self::DOMAIN));
+
+		$this->assertSame('/var/lib/freeswitch/storage/voicemail', $settings->get('switch', 'voicemail'));
+		$this->assertSame('file', $settings->get('cache', 'method', 'file'));
+	}
+
 	// FusionPBX caches the directory entry of each extension (directory:<ext>@<context>)
 	public function testCacheDeleteIsRecorded(): void
 	{

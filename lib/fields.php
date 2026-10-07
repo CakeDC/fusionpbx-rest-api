@@ -233,6 +233,58 @@ function rest_api_format_destinations($database, $domain_uuid, array $rows) {
     return $destinations;
 }
 
+// the "<number> XML <context>" a transfer to the target needs, as FusionPBX's
+// destination select builds it (voicemail: "*99<box>"); null when the target
+// isn't in the domain, false on a database error. the target is validated
+function rest_api_destination_transfer_data($database, $domain_uuid, $type, $target) {
+    $queries = array(
+        "extension" => "SELECT extension, number_alias, user_context FROM v_extensions WHERE domain_uuid = :domain_uuid AND (extension = :target OR number_alias = :target_alias)",
+        "ring_group" => "SELECT ring_group_extension, ring_group_context FROM v_ring_groups WHERE domain_uuid = :domain_uuid AND ring_group_uuid = :target",
+        "ivr" => "SELECT ivr_menu_extension, ivr_menu_context FROM v_ivr_menus WHERE domain_uuid = :domain_uuid AND ivr_menu_uuid = :target",
+        "voicemail" => "SELECT voicemail_id FROM v_voicemails WHERE domain_uuid = :domain_uuid AND voicemail_id = :target",
+    );
+    $parameters = array("domain_uuid" => $domain_uuid, "target" => $target);
+    if($type === "extension") {
+        $parameters["target_alias"] = $target;
+    }
+    $records = $database->select($queries[$type], $parameters, 'all');
+    $domain_name = $database->select("SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid", array("domain_uuid" => $domain_uuid), 'column');
+    if(!is_array($records) || $domain_name === false) {
+        return false;
+    }
+    if(!$records) {
+        return null;
+    }
+    $record = $records[0];
+    switch($type) {
+        case "extension":
+            return $target." XML ".($record["user_context"] ?: $domain_name);
+        case "ring_group":
+            return $record["ring_group_extension"]." XML ".($record["ring_group_context"] ?: $domain_name);
+        case "ivr":
+            return $record["ivr_menu_extension"]." XML ".($record["ivr_menu_context"] ?: $domain_name);
+        default:
+            return "*99".$record["voicemail_id"]." XML ".$domain_name;
+    }
+}
+
+// a destination action as FusionPBX's destination_edit.php writes it in the
+// dialplan XML (xml::sanitize(), keeping ${regex} and ${sofia_contact})
+function rest_api_dialplan_action_xml($app, $data) {
+    $sanitize = function($value) {
+        return htmlspecialchars(preg_replace('/\$\{[^}]+\}/', '', (string)$value), ENT_XML1);
+    };
+    $allowed = array("regex", "sofia_contact");
+    foreach($allowed as $command) {
+        $data = str_replace('${'.$command, '#{'.$command, (string)$data);
+    }
+    $data = $sanitize($data);
+    foreach($allowed as $command) {
+        $data = str_replace('#{'.$command, '${'.$command, $data);
+    }
+    return '<action application="'.$sanitize($app).'" data="'.$data.'"/>';
+}
+
 // cdr-search and cdr-details: the Cdr of the ZuluCall contract (#43937)
 const REST_API_CDR_FIELDS = array(
     "xml_cdr_uuid",
