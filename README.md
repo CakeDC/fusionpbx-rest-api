@@ -66,6 +66,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `domain-details` | none |
 | `domain-list` | `domain_view` (`domain_select` to see every domain) |
 | `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back) |
+| `extension-delete` | `extension_delete`, `extension_user_delete`, `follow_me_delete`, `follow_me_destination_delete`, `ring_group_destination_delete`, `extension_setting_delete`, `voicemail_delete`, `voicemail_option_delete`, `voicemail_message_delete`, `voicemail_destination_delete`, `voicemail_greeting_delete` (the admin and superadmin groups have them all by default) |
 | `extension-details` | `extension_view` |
 | `extension-list` | `extension_view` |
 | `extension-update` | `extension_edit`, plus per field: `caller_id_name` needs `effective_caller_id_name`, `outbound_caller_id_name`, `emergency_caller_id_name`; `caller_id_number` the same three `*_number` permissions; `enabled` needs `extension_enabled`; `user_uuid` needs `extension_user_add` (`extension_user_delete` for `null`) |
@@ -157,6 +158,17 @@ List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_pa
 create an extension
 
 Returns the extension's details, plus its SIP `password` when the key user has `extension_password`.
+
+## `extension-delete`
+
+| Parameter        | Required | Description |
+|------------------|----------|-------------|
+| `domain_uuid`    | no  | Domain to act on. Defaults to the key user's domain |
+| `extension_uuid` | yes | Extension to delete |
+
+Delete an extension (ZuluCall's `deleteExtension`) and what FusionPBX's "delete extension and voicemail" deletes with it: its user links, follow-me, extension settings, the ring group destinations that dial its number or alias, and the voicemail boxes of its number and numeric alias (options, messages, greetings, copies to other boxes, and the message files on disk). Clears FusionPBX's cached directory entry. Answers `204` with no body.
+
+An extension that doesn't exist or belongs to another domain returns `404 {"error": "extension not found"}`, and a malformed `extension_uuid` returns `400 {"error": "invalid extension_uuid"}`.
 
 ## `extension-details`
 

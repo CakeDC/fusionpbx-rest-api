@@ -12,8 +12,10 @@ class RestRoutingTest extends RestApiTestCase
 			'outside.php' => $marker,
 			'app/outside.php' => $marker,
 			// an app exposing an action through its own app_api.php mapping
-			'app/call_stats/app_api.php' => '<?php $app_api["call_stats"]["call-stats"] = "api/stats.php";',
+			'app/call_stats/app_api.php' => '<?php $app_api["call_stats"]["call-stats"] = "api/stats.php"; $app_api["call_stats"]["call-stats-reset"] = "api/reset.php";',
 			'app/call_stats/api/stats.php' => '<?php $required_params = array(); $required_permissions = array(); function do_action($body) { return array("calls" => 42); }',
+			// an app action answering 204 No Content, as delete actions do
+			'app/call_stats/api/reset.php' => '<?php $required_params = array(); $required_permissions = array(); function do_action($body) { return array("code" => 204); }',
 			// an app without an API
 			'app/no_api/index.php' => '<?php',
 			// an app whose mapping points outside its own directory
@@ -92,6 +94,15 @@ class RestRoutingTest extends RestApiTestCase
 
 		$this->assertSame(404, $response['status']);
 		$this->assertSame(array('error' => 'domain not found'), $this->json($response));
+	}
+
+	// a 204 response has no body (RFC 9110), not "[]"
+	public function testSendsNoBodyWithA204(): void
+	{
+		$response = $this->api(array('app' => 'call_stats', 'action' => 'call-stats-reset'));
+
+		$this->assertSame(204, $response['status']);
+		$this->assertSame('', $response['body']);
 	}
 
 	public function testListsTheExtensionsOfAUser(): void
