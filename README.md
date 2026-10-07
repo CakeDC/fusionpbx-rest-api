@@ -71,6 +71,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
+| `user-details` | `user_view` |
 | `user-list` | `user_view` |
 
 A missing permission returns `403 {"error": "forbidden", "missing_permissions": [...]}`.
@@ -183,6 +184,14 @@ List the extensions linked to a user (`v_extension_users`), sorted by extension 
 
 A user without extensions returns `{"data": []}`. A user that is not in the domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
 
+
+## `user-details`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `user_uuid`   | yes | FusionPBX user to look up |
+
+Return one FusionPBX user (ZuluCall's `getUser`), to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
 
 ## `user-list`
 | Parameter     | Required | Description |
