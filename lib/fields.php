@@ -138,6 +138,101 @@ function rest_api_decode_destination($destination) {
     return $destination;
 }
 
+// ZuluCall's Destination (#43976) from v_destinations rows. FusionPBX stores
+// a route as transfer actions, "<number> XML <context>" (voicemail: "*99<box>"),
+// so destination_type and target come from what the number is in the domain.
+// a route with anything but one such action, or to a number none of the four
+// types owns, gets null for both. false on a database error
+function rest_api_format_destinations($database, $domain_uuid, array $rows) {
+    $numbers = array();
+    foreach($rows as $i => $row) {
+        $actions = json_decode((string)$row["destination_actions"], true);
+        if(is_array($actions) && count($actions) === 1 && ($actions[0]["destination_app"] ?? null) === "transfer"
+            && preg_match('/^(\S+) XML \S+$/', (string)($actions[0]["destination_data"] ?? ""), $m)) {
+            $numbers[$i] = $m[1];
+        }
+    }
+
+    // each "?" becomes a list of the numbers, every one with its own placeholder
+    $lookup = function($sql, $values) use ($database, $domain_uuid) {
+        if(!$values) {
+            return array();
+        }
+        $values = array_values(array_unique(array_map("strval", $values)));
+        $parameters = array("domain_uuid" => $domain_uuid);
+        $list = 0;
+        $sql = preg_replace_callback('/\?/', function() use ($values, &$parameters, &$list) {
+            $names = array();
+            foreach($values as $v => $value) {
+                $parameters["n".$list."_".$v] = $value;
+                $names[] = ":n".$list."_".$v;
+            }
+            $list++;
+            return implode(", ", $names);
+        }, $sql);
+        return $database->select($sql, $parameters, 'all');
+    };
+    $voicemail_ids = array();
+    foreach($numbers as $number) {
+        if(strpos($number, "*99") === 0) {
+            $voicemail_ids[] = substr($number, 3);
+        }
+    }
+    // type => array(records, number column, target column)
+    $found = array(
+        "voicemail" => array($lookup("SELECT voicemail_id FROM v_voicemails WHERE domain_uuid = :domain_uuid AND voicemail_id IN (?)", $voicemail_ids), "voicemail_id", "voicemail_id"),
+        "ring_group" => array($lookup("SELECT ring_group_extension, ring_group_uuid FROM v_ring_groups WHERE domain_uuid = :domain_uuid AND ring_group_extension IN (?)", $numbers), "ring_group_extension", "ring_group_uuid"),
+        "ivr" => array($lookup("SELECT ivr_menu_extension, ivr_menu_uuid FROM v_ivr_menus WHERE domain_uuid = :domain_uuid AND ivr_menu_extension IN (?)", $numbers), "ivr_menu_extension", "ivr_menu_uuid"),
+        // the number dialed is the target, whether extension or alias
+        "extension" => array($lookup("SELECT extension, number_alias FROM v_extensions WHERE domain_uuid = :domain_uuid AND (extension IN (?) OR number_alias IN (?))", $numbers), null, null),
+    );
+    $targets = array();
+    foreach($found as $type => list($records, $number_column, $target_column)) {
+        if(!is_array($records)) {
+            return false;
+        }
+        foreach($records as $record) {
+            if($number_column !== null) {
+                $targets[$type][(string)$record[$number_column]] = (string)$record[$target_column];
+                continue;
+            }
+            foreach(array("extension", "number_alias") as $column) {
+                if((string)$record[$column] !== "") {
+                    $targets[$type][(string)$record[$column]] = (string)$record[$column];
+                }
+            }
+        }
+    }
+
+    $destinations = array();
+    foreach($rows as $i => $row) {
+        $type = null;
+        $target = null;
+        if(isset($numbers[$i])) {
+            $number = $numbers[$i];
+            $voicemail_id = strpos($number, "*99") === 0 ? substr($number, 3) : null;
+            if($voicemail_id !== null && isset($targets["voicemail"][$voicemail_id])) {
+                list($type, $target) = array("voicemail", $targets["voicemail"][$voicemail_id]);
+            } else {
+                foreach(array("ring_group", "ivr", "extension") as $candidate) {
+                    if(isset($targets[$candidate][$number])) {
+                        list($type, $target) = array($candidate, $targets[$candidate][$number]);
+                        break;
+                    }
+                }
+            }
+        }
+        $destinations[] = array(
+            "domain_uuid" => $row["domain_uuid"],
+            "number" => $row["destination_number"],
+            "destination_type" => $type,
+            "target" => $target,
+            "enabled" => in_array($row["destination_enabled"], array(true, 1, "1", "t", "true"), true),
+        );
+    }
+    return $destinations;
+}
+
 // cdr-search and cdr-details: the Cdr of the ZuluCall contract (#43937)
 const REST_API_CDR_FIELDS = array(
     "xml_cdr_uuid",

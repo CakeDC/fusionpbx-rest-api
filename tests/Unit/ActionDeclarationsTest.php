@@ -19,6 +19,7 @@ class ActionDeclarationsTest extends TestCase
 		'cdr-search' => array('xml_cdr_view'),
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
 		'destination-details' => array('destination_view'),
+		'destination-list' => array('destination_view'),
 		'domain-details' => array(),
 		'domain-list' => array('domain_view'),
 		'extension-create' => array('extension_add', 'voicemail_add'),

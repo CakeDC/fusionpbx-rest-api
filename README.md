@@ -63,6 +63,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `cdr-search` | `xml_cdr_view` |
 | `destination-create` | `destination_add`, `dialplan_add`, `dialplan_detail_add` |
 | `destination-details` | `destination_view` |
+| `destination-list` | `destination_view` |
 | `domain-details` | none |
 | `domain-list` | `domain_view` (`domain_select` to see every domain) |
 | `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back, `extension_user_add` to link a user) |
@@ -130,6 +131,26 @@ Creates a new destination in FusionPBX.
 | `domain_uuid` | no | Domain to search. Defaults to the key user's domain; users with `domain_select` who leave it out search every domain |
 
 looks up details for a particular destination
+
+## `destination-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `page`        | no | Page number, from 1 (default 1, at most 1000000) |
+| `per_page`    | no | Rows per page, 1 to 200 (default 25) |
+
+List the inbound destinations (DIDs) of a domain, disabled ones included, sorted by number: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 12}}` (ZuluCall's `listDestinations`). Each item has `domain_uuid`, `number`, `destination_type`, `target` and `enabled` (boolean).
+
+FusionPBX stores a destination as actions such as `transfer 100 XML <domain>`. When a destination has exactly one `transfer` action, its number is looked up in the domain:
+
+| `destination_type` | When the number is | `target` |
+|---|---|---|
+| `voicemail` | `*99<box>`, a voicemail box | the box number |
+| `ring_group` | a ring group's extension | the ring group's uuid |
+| `ivr` | an IVR menu's extension | the IVR menu's uuid |
+| `extension` | an extension's number or alias | the number |
+
+Any other destination (a time condition, a call flow, a fax, several actions, a number nothing in the domain owns) has `destination_type` and `target` `null`. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `domain-details`
 
