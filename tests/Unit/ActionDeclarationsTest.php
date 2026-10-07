@@ -18,6 +18,7 @@ class ActionDeclarationsTest extends TestCase
 		'cdr-list' => array('xml_cdr_view'),
 		'cdr-search' => array('xml_cdr_view'),
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
+		'destination-delete' => array('destination_delete', 'dialplan_delete', 'dialplan_detail_delete'),
 		'destination-details' => array('destination_view'),
 		'destination-list' => array('destination_view'),
 		'destination-update' => array('destination_edit', 'dialplan_edit', 'dialplan_detail_add', 'dialplan_detail_delete'),

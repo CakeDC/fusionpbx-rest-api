@@ -62,6 +62,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `cdr-list` | `xml_cdr_view` |
 | `cdr-search` | `xml_cdr_view` |
 | `destination-create` | `destination_add`, `dialplan_add`, `dialplan_detail_add` |
+| `destination-delete` | `destination_delete`, `dialplan_delete`, `dialplan_detail_delete` |
 | `destination-details` | `destination_view` |
 | `destination-list` | `destination_view` |
 | `destination-update` | `destination_edit`, `dialplan_edit`, `dialplan_detail_add`, `dialplan_detail_delete` |
@@ -124,6 +125,14 @@ All actions are defined in the `actions/` directory of this repo. What follows i
 | `extension`   | yes      | Extension to transfer calls for this number to |
 
 Creates a new destination in FusionPBX.
+
+## `destination-delete`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `number`      | yes | Inbound number of the destination to delete |
+
+Delete an inbound destination (ZuluCall's `deleteDestination`) with its dialplan and dialplan details, as FusionPBX's destinations page does, and clear the dialplan cache of its context. Answers `204` with no body. A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, and an invalid number returns `400 {"error": "invalid number"}`.
 
 ## `destination-details`
 | Parameter     | Required | Description |

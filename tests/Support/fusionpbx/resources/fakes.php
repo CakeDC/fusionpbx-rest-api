@@ -29,6 +29,7 @@ class FakeStore {
 			'esl_response' => "+OK 7f4de3d2-0000-4000-8000-00000000c411\n",
 			'esl_available' => true,
 			'save_fails' => false,
+			'delete_fails' => false,
 			'select_fails' => false,
 			'uuid_counter' => 0,
 		));
@@ -722,9 +723,13 @@ class database {
 	/**
 	 * Like FusionPBX 5.6.5's delete(): removes the rows of v_<table> matching
 	 * every given field. A table without "<singular>_delete" is skipped without
-	 * an error (added to "skipped"), and it still returns true.
+	 * an error (added to "skipped"), and it still returns true. It returns false
+	 * when the database rejects the statement (simulated by delete_fails).
 	 */
 	public function delete(array $array) {
+		if (FakeStore::read()['delete_fails'] ?? false) {
+			return false;
+		}
 		$allowed = array();
 		$skipped = array();
 		foreach ($array as $table => $rows) {
