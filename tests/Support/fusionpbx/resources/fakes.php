@@ -24,6 +24,7 @@ class FakeStore {
 			'queries' => array(),
 			'saved' => array(),
 			'skipped' => array(),
+			'cache_deleted' => array(),
 			'esl_commands' => array(),
 			'esl_response' => "+OK 7f4de3d2-0000-4000-8000-00000000c411\n",
 			'esl_available' => true,
@@ -658,10 +659,12 @@ class database {
 	}
 
 	/**
-	 * Like FusionPBX 5.6.5's save(): a record whose table lacks the "<singular>_add"
-	 * permission is skipped without an error (its table is added to "skipped" so
-	 * tests can see it), saved records get insert_user from this object, and it
-	 * returns false when the database rejects the records (simulated by save_fails).
+	 * Like FusionPBX 5.6.5's save(): a record whose "<singular>_uuid" already
+	 * exists is updated (only the given fields, with update_user) and needs
+	 * "<singular>_edit"; any other record is added with insert_user and needs
+	 * "<singular>_add". A record without its permission is skipped without an
+	 * error (its table is added to "skipped" so tests can see it). It returns
+	 * false when the database rejects the records (simulated by save_fails).
 	 * Records are stored in v_<table>, nested child records in their own tables.
 	 */
 	public function save(array $array) {
@@ -684,12 +687,15 @@ class database {
 		if (FakeStore::read()['save_fails']) {
 			return false;
 		}
+		$tables = FakeStore::read()['tables'];
 		$allowed = array();
 		$skipped = array();
 		foreach ($records as $record) {
-			if (permission_exists(rtrim($record[0], 's').'_add')) {
-				$record[1]['insert_user'] = $this->user_uuid;
-				$allowed[] = $record;
+			$key = rtrim($record[0], 's').'_uuid';
+			$exists = isset($record[1][$key]) && in_array($record[1][$key], array_column($tables['v_'.$record[0]] ?? array(), $key), true);
+			if (permission_exists(rtrim($record[0], 's').($exists ? '_edit' : '_add'))) {
+				$record[1][$exists ? 'update_user' : 'insert_user'] = $this->user_uuid;
+				$allowed[] = array($record[0], $record[1], $exists ? $key : null);
 			} else {
 				$skipped[] = $record[0];
 			}
@@ -697,10 +703,56 @@ class database {
 
 		FakeStore::update(function (&$state) use ($allowed, $skipped, $array) {
 			$state['saved'][] = array('app_uuid' => $this->app_uuid, 'array' => $array);
-			foreach ($allowed as $record) {
-				$state['tables']['v_'.$record[0]][] = $record[1];
+			foreach ($allowed as list($table, $fields, $key)) {
+				if ($key === null) {
+					$state['tables']['v_'.$table][] = $fields;
+					continue;
+				}
+				foreach ($state['tables']['v_'.$table] as $i => $row) {
+					if (($row[$key] ?? null) === $fields[$key]) {
+						$state['tables']['v_'.$table][$i] = array_merge($row, $fields);
+					}
+				}
 			}
 			$state['skipped'] = array_merge($state['skipped'], $skipped);
+		});
+		return true;
+	}
+
+	/**
+	 * Like FusionPBX 5.6.5's delete(): removes the rows of v_<table> matching
+	 * every given field. A table without "<singular>_delete" is skipped without
+	 * an error (added to "skipped"), and it still returns true.
+	 */
+	public function delete(array $array) {
+		$allowed = array();
+		$skipped = array();
+		foreach ($array as $table => $rows) {
+			foreach ($rows as $fields) {
+				if (permission_exists(rtrim($table, 's').'_delete')) {
+					$allowed[] = array($table, $fields);
+				} else {
+					$skipped[] = $table;
+				}
+			}
+		}
+		FakeStore::update(function (&$state) use ($allowed, $skipped) {
+			foreach ($allowed as list($table, $fields)) {
+				$state['tables']['v_'.$table] = array_values(array_filter($state['tables']['v_'.$table] ?? array(), function ($row) use ($fields) {
+					return array_intersect_assoc($fields, $row) != $fields;
+				}));
+			}
+			$state['skipped'] = array_merge($state['skipped'], $skipped);
+		});
+		return true;
+	}
+}
+
+// FusionPBX's cache (memcache or files). deleted keys go to "cache_deleted"
+class cache {
+	public function delete($key) {
+		FakeStore::update(function (&$state) use ($key) {
+			$state['cache_deleted'][] = $key;
 		});
 		return true;
 	}
