@@ -40,6 +40,17 @@ class RestPermissionsTest extends RestApiTestCase
 		$this->assertArrayNotHasKey('v_extensions', $this->state()['tables']);
 	}
 
+	// listing a user's extensions also tells whether the user exists (#43936)
+	public function testListingAUsersExtensionsNeedsUserView(): void
+	{
+		$this->grantOnly(array('extension_view'));
+
+		$response = $this->api(array('action' => 'extension-user-list', 'user_uuid' => self::USER_UUID));
+
+		$this->assertSame(403, $response['status']);
+		$this->assertSame(array('error' => 'forbidden', 'missing_permissions' => array('user_view')), $this->json($response));
+	}
+
 	public function testChecksPermissionsBeforeParameters(): void
 	{
 		$this->grantOnly(array());

@@ -62,6 +62,18 @@ const REST_API_EXTENSION_FIELDS = array(
     "update_user"
 );
 
+// extension-user-list: the Extension of the ZuluCall contract (#43936)
+const REST_API_USER_EXTENSION_FIELDS = array(
+    "extension_uuid",
+    "extension",
+    "domain_uuid",
+    "directory_first_name",
+    "directory_last_name",
+    "emergency_caller_id_number",
+    "outbound_caller_id_number",
+    "enabled"
+);
+
 const REST_API_DESTINATION_FIELDS = array(
     "destination_uuid",
     "domain_uuid",
@@ -109,4 +121,47 @@ function rest_api_decode_destination($destination) {
         $destination['destination_actions'] = json_decode($destination['destination_actions']);
     }
     return $destination;
+}
+
+// cdr-search and cdr-details: the Cdr of the ZuluCall contract (#43937)
+const REST_API_CDR_FIELDS = array(
+    "xml_cdr_uuid",
+    "direction",
+    "caller_id_name",
+    "caller_id_number",
+    "destination_number",
+    "start_stamp",
+    "end_stamp",
+    "duration",
+    "hangup_cause",
+    "hangup_cause_q850",
+    "missed_call",
+    "leg",
+    "bridge_uuid",
+    "originating_leg_uuid",
+    "extension_uuid",
+    "record_name",
+    "record_path",
+    "call_center_queue_uuid",
+    "cc_queue"
+);
+
+// the database may return numbers as text and booleans as "t"/"f". record_name
+// and record_path are null when the call was not recorded
+function rest_api_format_cdr($cdr) {
+    $cdr['duration'] = (int)$cdr['duration'];
+    $cdr['hangup_cause_q850'] = is_numeric($cdr['hangup_cause_q850']) ? (int)$cdr['hangup_cause_q850'] : null;
+    $cdr['missed_call'] = in_array($cdr['missed_call'], array(true, 1, "1", "t", "true"), true);
+    foreach(array("record_name", "record_path") as $column) {
+        if($cdr[$column] === "") {
+            $cdr[$column] = null;
+        }
+    }
+    return $cdr;
+}
+
+// enabled is "true"/"false" text, or a boolean when the column is one
+function rest_api_format_user_extension($extension) {
+    $extension['enabled'] = in_array($extension['enabled'], array(true, 1, "1", "t", "true"), true);
+    return $extension;
 }

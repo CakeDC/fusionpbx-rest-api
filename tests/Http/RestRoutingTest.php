@@ -94,6 +94,30 @@ class RestRoutingTest extends RestApiTestCase
 		$this->assertSame(array('error' => 'domain not found'), $this->json($response));
 	}
 
+	public function testListsTheExtensionsOfAUser(): void
+	{
+		$response = $this->api(array('action' => 'extension-user-list', 'user_uuid' => self::USER_UUID));
+
+		$this->assertSame(200, $response['status']);
+		$this->assertSame(array('data' => array()), $this->json($response));
+	}
+
+	public function testAnswersNotFoundForAnUnknownUser(): void
+	{
+		$response = $this->api(array('action' => 'extension-user-list', 'user_uuid' => 'dddddddd-0000-4000-8000-000000000099'));
+
+		$this->assertSame(404, $response['status']);
+		$this->assertSame(array('error' => 'user not found'), $this->json($response));
+	}
+
+	public function testRejectsAMalformedUserUuid(): void
+	{
+		$response = $this->api(array('action' => 'extension-user-list', 'user_uuid' => 'not-a-uuid'));
+
+		$this->assertSame(400, $response['status']);
+		$this->assertSame(array('error' => 'invalid user_uuid'), $this->json($response));
+	}
+
 	public function testRequiresAnAction(): void
 	{
 		$response = $this->api(array('domain_name' => 'tenant1.example.com'));

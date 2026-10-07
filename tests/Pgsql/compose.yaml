@@ -1,0 +1,30 @@
+# The pgsql test suite against a throwaway PostgreSQL: composer test-pgsql.
+# POSTGRES_VERSION defaults to the one the FusionPBX installer sets up.
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-18}
+    environment:
+      POSTGRES_DB: fusionpbx
+      POSTGRES_USER: fusionpbx
+      POSTGRES_PASSWORD: fusionpbx
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "fusionpbx", "-d", "fusionpbx"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+  php:
+    build:
+      context: .
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.3}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      REST_API_PGSQL_DSN: "pgsql:host=postgres port=5432 dbname=fusionpbx user=fusionpbx password=fusionpbx"
+    volumes:
+      - ../..:/app
+    working_dir: /app
+    command: ["vendor/bin/phpunit", "--testsuite", "pgsql"]

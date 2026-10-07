@@ -65,4 +65,77 @@ class InputValidationTest extends TestCase
 	{
 		$this->assertFalse(is_dial_number($value));
 	}
+	public function testParseListAcceptsTextAndArrays(): void
+	{
+		$this->assertSame(array('1001', '1002'), rest_api_parse_list(' 1001, 1002,,1001 '));
+		$this->assertSame(array('1001', '1002'), rest_api_parse_list(array('1001', 1002)));
+	}
+
+	public function testParseListRejectsEmptyAndNestedValues(): void
+	{
+		foreach (array('', ' , ', array(), array(array('1001')), 1001, null, true) as $value) {
+			$this->assertFalse(rest_api_parse_list($value), json_encode($value));
+		}
+	}
+
+	// each item becomes a placeholder, several times over, and Postgres
+	// takes at most 65535 per query
+	public function testParseListRejectsMoreThanAHundredItems(): void
+	{
+		$this->assertCount(100, rest_api_parse_list(range(1, 100)));
+		$this->assertFalse(rest_api_parse_list(implode(',', range(1, 101))));
+	}
+
+	public function testParseBool(): void
+	{
+		foreach (array(true, 1, '1', 'true') as $value) {
+			$this->assertTrue(rest_api_parse_bool($value), json_encode($value));
+		}
+		foreach (array(false, 0, '0', 'false') as $value) {
+			$this->assertFalse(rest_api_parse_bool($value), json_encode($value));
+		}
+		foreach (array('yes', 'TRUE', 2, '', null, array()) as $value) {
+			$this->assertNull(rest_api_parse_bool($value), json_encode($value));
+		}
+	}
+
+	public function testParseInt(): void
+	{
+		$this->assertSame(3, rest_api_parse_int('3', 1, 200));
+		$this->assertSame(200, rest_api_parse_int(200, 1, 200));
+		foreach (array(0, 201, '1.5', '-1', ' 3', 2.0, '', null, '9999999999999999999') as $value) {
+			$this->assertFalse(rest_api_parse_int($value, 1, 200), json_encode($value));
+		}
+	}
+
+	public static function timestamps(): array
+	{
+		return array(
+			'date' => array('2026-09-01', '2026-09-01 00:00:00+00:00', true),
+			'utc' => array('2026-09-01T10:00:00Z', '2026-09-01 10:00:00+00:00', false),
+			'no offset is utc' => array('2026-09-01 10:00', '2026-09-01 10:00:00+00:00', false),
+			'offset' => array('2026-09-01T12:00:00+02:00', '2026-09-01 10:00:00+00:00', false),
+			'fraction' => array('2026-09-01T10:00:00.5-0100', '2026-09-01 11:00:00+00:00', false),
+		);
+	}
+
+	#[DataProvider('timestamps')]
+	public function testParseTimestampReturnsUtc(string $value, string $utc, bool $date_only): void
+	{
+		$parsed = rest_api_parse_timestamp($value);
+
+		$this->assertSame(array($utc, $date_only), array($parsed[0]->format('Y-m-d H:i:sP'), $parsed[1]));
+	}
+
+	public function testParseTimestampRejectsInvalidDates(): void
+	{
+		foreach (array('2026-10-03T10:00:00+99:99', '2026-10-03T10:00:00-2400', '2026-02-30', '2026-13-01', '2026-09-01T24:00:00Z', '2026-09-01T10:60Z', 'yesterday', '1 September 2026', '', 20260901, null) as $value) {
+			$this->assertFalse(rest_api_parse_timestamp($value), json_encode($value));
+		}
+	}
+
+	public function testLikeEscapeMakesWildcardsLiteral(): void
+	{
+		$this->assertSame('100!%!_!!\\', rest_api_like_escape('100%_!\\'));
+	}
 }

@@ -3,7 +3,7 @@ An HTTP API for [FusionPBX](http://www.fusionpbx.com/).
 
 # Install
 To install it, clone into fusionpbx's `app/` folder. Make sure this repo clones into a folder called `rest_api`.
-Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions.)
+Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, App Defaults, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions. App Defaults adds the index on `v_xml_cdr.originating_leg_uuid` that `cdr-search` and `cdr-details` need on PostgreSQL; on a large CDR table it can take a few minutes, without blocking new call records.)
 
 # Compatibility
 
@@ -50,13 +50,16 @@ Each action needs these FusionPBX permissions in the key user's groups:
 
 | Action | Permissions |
 |---|---|
+| `cdr-details` | `xml_cdr_view` |
 | `cdr-list` | `xml_cdr_view` |
+| `cdr-search` | `xml_cdr_view` |
 | `destination-create` | `destination_add`, `dialplan_add`, `dialplan_detail_add` |
 | `destination-details` | `destination_view` |
 | `domain-details` | none |
 | `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back) |
 | `extension-details` | `extension_view` |
 | `extension-list` | `extension_view` |
+| `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
 
@@ -89,6 +92,7 @@ This version changes how keys work:
 - Each integration's user needs the permissions listed above.
 - Responses only contain the documented columns. `extension-create` no longer returns the SIP password unless the user has `extension_password`. Anything that read other columns from `extension-create`, `destination-create`, `destination-details`, `ringgroup-create` or `domain-details` must be updated.
 - `domain_uuid` is now optional. It defaults to the key user's domain.
+- Also check App Defaults when you upgrade: it adds the `v_xml_cdr_originating_leg_uuid_idx` index used by `cdr-search` and `cdr-details`. Without it they still work, but slowly on large CDR tables.
 
 # Actions
 All actions are defined in the `actions/` directory of this repo. What follows is a best effort attempt to document them.
@@ -150,6 +154,17 @@ get all details of an extension
 List number, UUID and a few other details of all extensions on a given domain.
 
 
+## `extension-user-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `user_uuid`   | yes | FusionPBX user whose extensions to list |
+
+List the extensions linked to a user (`v_extension_users`), sorted by extension number (as text), disabled ones included, each once even if linked twice. A user can have several extensions; FusionPBX has no primary one, so the caller picks. Returns `{"data": [...]}` (ZuluCall's `listUserExtensions`). Each item has `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`.
+
+A user without extensions returns `{"data": []}`. A user that is not in the domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
+
+
 ## `ringgroup-create`
 | Parameter      | Required | Description |
 |----------------|----------|-------------|
@@ -176,12 +191,73 @@ Note that the call is ended when destination_a ends the call, so if one leg isn'
 
 Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 
+## `cdr-search`
+| Parameter        | Required | Description |
+|------------------|----------|-------------|
+| `domain_uuid`    | no | Domain to act on. Defaults to the key user's domain |
+| `start_date`     | no | Calls that started at or after this ISO 8601 date-time (UTC without an offset). A date alone (`2026-09-01`) means 00:00 UTC of that day |
+| `end_date`       | no | Calls that started at or before this date-time. A date alone includes the whole day (UTC). Not before `start_date` |
+| `direction`      | no | `inbound`, `outbound` or `local` |
+| `extension_uuid` | no | Comma-separated string or array of up to 100 extension uuids. Calls where any leg belongs to one of them, so the extension that received a call sees it as well as the one that made it. Each call is returned once |
+| `counterparty`   | no | Text (up to 64 characters) the caller or destination number contains. `%` and `_` are plain characters |
+| `own_number`     | no | Comma-separated string or array of up to 100 of the viewer's own numbers. With `counterparty`, only the other party is searched: the destination when the caller is one of them, else the caller when the destination is one of them, else both |
+| `missed`         | no | `true` for missed calls only, `false` to leave them out |
+| `calls_only`     | no | `true` (default): one row per call. `false`: one row per leg |
+| `sort`           | no | `-start_stamp` (default, newest first) or `start_stamp` |
+| `page`           | no | Page number, from 1 (default 1, at most 1000000) |
+| `per_page`       | no | Rows per page, 1 to 200 (default 25) |
+
+Search the call detail records (`v_xml_cdr`). Booleans may be JSON booleans, `"true"`/`"false"`, `1`/`0` or `"1"`/`"0"`; `page` and `per_page` may be integers or digit strings.
+
+FusionPBX writes one record per call leg and doesn't give the legs of a call a shared id: an `a` leg's `bridge_uuid` is the `xml_cdr_uuid` of the `b` leg it was bridged to, and a `b` leg's `originating_leg_uuid` is the `xml_cdr_uuid` of its `a` leg, so every leg a ring group rang points at the same `a` leg. With `calls_only`, a call is shown as its `a` leg, or, when that leg isn't in the domain, as the earliest of the `b` legs that share an `originating_leg_uuid`. Every filter except `extension_uuid` applies to that row, and `total` counts calls. Only direct links are followed (no transfer chains), and this linking hasn't yet been checked against a production CDR export.
+
+```json
+{
+  "data": [
+    {
+      "xml_cdr_uuid": "c0000001-0000-4000-8000-00000000000a",
+      "direction": "inbound",
+      "caller_id_name": "ACME",
+      "caller_id_number": "+15550001111",
+      "destination_number": "5000",
+      "start_stamp": "2026-09-01 09:00:00+00",
+      "end_stamp": "2026-09-01 09:01:35+00",
+      "duration": 95,
+      "hangup_cause": "NORMAL_CLEARING",
+      "hangup_cause_q850": 16,
+      "missed_call": false,
+      "leg": "a",
+      "bridge_uuid": "c0000001-0000-4000-8000-0000000000b1",
+      "originating_leg_uuid": null,
+      "extension_uuid": null,
+      "record_name": "c1.wav",
+      "record_path": "/var/lib/freeswitch/recordings/tenant1.example.com/archive/2026/Sep/01",
+      "call_center_queue_uuid": null,
+      "cc_queue": null
+    }
+  ],
+  "pagination": {"page": 1, "per_page": 25, "total": 1}
+}
+```
+
+`record_name` and `record_path` (the recording's directory on the PBX) are `null` for calls that weren't recorded. A page past the last returns `"data": []` with the correct `total`. An invalid parameter returns `400 {"error": "invalid <parameter>"}`.
+
+## `cdr-details`
+| Parameter      | Required | Description |
+|----------------|----------|-------------|
+| `domain_uuid`  | no | Domain to act on. Defaults to the key user's domain |
+| `xml_cdr_uuid` | yes | Any leg of the call |
+
+Return a call with every one of its legs, linked as in `cdr-search`, oldest first: `{"xml_cdr_uuid": "<uuid of the main leg>", "legs": [...]}`. Each leg has the fields of a `cdr-search` row, so `leg`, `extension_uuid`, `record_name` and `record_path` tell which extensions took part and where the recording is.
+
+A call that doesn't exist or belongs to another domain returns `404 {"error": "call not found"}`; a missing or malformed `xml_cdr_uuid` returns `400 {"error": "invalid xml_cdr_uuid"}`.
+
 ## `cdr-list`
 | Parameter          | Required | Description |
 |--------------------|----------|-------------|
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 
-returns the the last 100 call detail records.
+Legacy: returns the last 100 call detail records (one per leg) with no filters. New clients should use `cdr-search` and `cdr-details`.
 
 # Development
 
@@ -195,6 +271,15 @@ composer test
 
 * `tests/Unit`: the `lib/` helpers and every action, each test in its own PHP process.
 * `tests/Http`: `rest.php` and the key management pages, served by PHP's built-in web server from a temporary FusionPBX-like document root.
+
+The in-memory database only shows that the plugin's SQL does what it should, not that PostgreSQL accepts it. The `pgsql` suite (`tests/Pgsql`) runs the `cdr-search` and `cdr-details` tests, and the App Defaults index, on a real PostgreSQL with FusionPBX 5.6.5's `v_xml_cdr` columns, through PDO the way FusionPBX's `database` class uses it. It needs Docker:
+
+```
+composer test-pgsql                         # PostgreSQL 18 (the FusionPBX installer's default), PHP 8.3
+POSTGRES_VERSION=16 PHP_VERSION=8.4 composer test-pgsql
+```
+
+To use a PostgreSQL of your own, set `REST_API_PGSQL_DSN` (e.g. `pgsql:host=127.0.0.1 port=5432 dbname=test user=test password=test`) and run `vendor/bin/phpunit --testsuite pgsql`; PHP needs `pdo_pgsql`. The suite creates and empties `v_xml_cdr` and creates `v_xml_cdr_originating_leg_uuid_idx`, so never point it at a FusionPBX database.
 
 To check that the tests catch a regression, run them against another checkout of the plugin, for example an older commit:
 

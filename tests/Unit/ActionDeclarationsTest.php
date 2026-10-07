@@ -14,13 +14,16 @@ use PHPUnit\Framework\TestCase;
 class ActionDeclarationsTest extends TestCase
 {
 	private const PERMISSIONS = array(
+		'cdr-details' => array('xml_cdr_view'),
 		'cdr-list' => array('xml_cdr_view'),
+		'cdr-search' => array('xml_cdr_view'),
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
 		'destination-details' => array('destination_view'),
 		'domain-details' => array(),
 		'extension-create' => array('extension_add', 'voicemail_add'),
 		'extension-details' => array('extension_view'),
 		'extension-list' => array('extension_view'),
+		'extension-user-list' => array('extension_view', 'user_view'),
 		'originate' => array('click_to_call_call'),
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
 	);
