@@ -1,13 +1,21 @@
 # FusionPBX REST API
-An HTTP API for [FusionPBX](http://www.fusionpbx.com/).
+An HTTP API for [FusionPBX](http://www.fusionpbx.com/). Based on [AccelerateNetworks/fusionpbx-rest-api](https://github.com/AccelerateNetworks/fusionpbx-rest-api).
 
 # Install
-To install it, clone into fusionpbx's `app/` folder. Make sure this repo clones into a folder called `rest_api`.
+Clone a release into FusionPBX's `app/` folder, into a folder called `rest_api`:
+
+```
+cd /var/www/fusionpbx/app
+git clone --branch v1.0.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
+```
+
 Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, App Defaults, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions. App Defaults adds the index on `v_xml_cdr.originating_leg_uuid` that `cdr-search` and `cdr-details` need on PostgreSQL; on a large CDR table it can take a few minutes, without blocking new call records.)
+
+To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout v<version>`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) first.
 
 # Compatibility
 
-This version targets FusionPBX **5.6.5**.
+Version 1.0.0 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases).
 
 # Use
 
@@ -87,7 +95,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 ## Upgrading from earlier versions
 
-This version changes how keys work:
+Version 1.0.0 is the first release. Coming from the AccelerateNetworks code, or from a checkout older than 1.0.0, note that it changes how keys work:
 - After upgrading, run Advanced → Upgrade → Schema, Menu Defaults and Permission Defaults, then log out and back in (permissions are cached in the session) before editing keys. **Existing keys stop working** until a superadmin edits each one, picks a user and enables it.
 - Each integration's user needs the permissions listed above.
 - Responses only contain the documented columns. `extension-create` no longer returns the SIP password unless the user has `extension_password`. Anything that read other columns from `extension-create`, `destination-create`, `destination-details`, `ringgroup-create` or `domain-details` must be updated.
