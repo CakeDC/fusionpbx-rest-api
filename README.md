@@ -75,6 +75,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
+| `ringgroup-list` | `ring_group_view`, `ring_group_destination_view` |
 | `user-details` | `user_view` |
 | `user-list` | `user_view` |
 
@@ -281,6 +282,15 @@ List the FusionPBX users of a domain, disabled ones included, sorted by username
 | `strategy`     | yes      | one of: `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
 
 Create a ring group
+
+## `ringgroup-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `page`        | no | Page number, from 1 (default 1, at most 1000000) |
+| `per_page`    | no | Rows per page, 1 to 200 (default 25) |
+
+List the ring groups of a domain, disabled ones included, sorted by extension: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}` (ZuluCall's `listRingGroups`). Each item has `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` (`[{"number": "101"}, ...]`, in the order FusionPBX shows them: by delay, then number). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `originate`
 | Parameter          | Required | Description |

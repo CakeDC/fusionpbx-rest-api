@@ -107,6 +107,49 @@ const REST_API_RING_GROUP_DESTINATION_FIELDS = array(
     "destination_enabled"
 );
 
+// ZuluCall's RingGroup (#43979) from v_ring_groups rows (ring_group_uuid,
+// domain_uuid, ring_group_name, ring_group_extension, ring_group_strategy),
+// with the destinations of all of them read in one query. destinations are
+// in FusionPBX's order, by delay (a number, sorted here so text and numeric
+// columns agree) then number. false on a database error
+function rest_api_format_ring_groups($database, array $rows) {
+    $destinations = array();
+    if($rows) {
+        $parameters = array();
+        $placeholders = array();
+        foreach(array_values($rows) as $i => $row) {
+            $placeholders[] = ":ring_group_uuid_".$i;
+            $parameters["ring_group_uuid_".$i] = $row["ring_group_uuid"];
+        }
+        $sql = "SELECT ring_group_uuid, destination_number, destination_delay FROM v_ring_group_destinations";
+        $sql .= " WHERE ring_group_uuid IN (".implode(", ", $placeholders).")";
+        $records = $database->select($sql, $parameters, 'all');
+        if(!is_array($records)) {
+            return false;
+        }
+        usort($records, function($a, $b) {
+            return array((float)$a["destination_delay"], (string)$a["destination_number"])
+                <=> array((float)$b["destination_delay"], (string)$b["destination_number"]);
+        });
+        foreach($records as $record) {
+            $destinations[$record["ring_group_uuid"]][] = array("number" => (string)$record["destination_number"]);
+        }
+    }
+
+    $ring_groups = array();
+    foreach($rows as $row) {
+        $ring_groups[] = array(
+            "ring_group_uuid" => $row["ring_group_uuid"],
+            "domain_uuid" => $row["domain_uuid"],
+            "name" => $row["ring_group_name"],
+            "extension" => $row["ring_group_extension"],
+            "strategy" => $row["ring_group_strategy"],
+            "destinations" => $destinations[$row["ring_group_uuid"]] ?? array(),
+        );
+    }
+    return $ring_groups;
+}
+
 const REST_API_DOMAIN_FIELDS = array(
     "domain_uuid",
     "domain_parent_uuid",
