@@ -65,7 +65,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `destination-details` | `destination_view` |
 | `domain-details` | none |
 | `domain-list` | `domain_view` (`domain_select` to see every domain) |
-| `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back) |
+| `extension-create` | `extension_add`, `voicemail_add` (`extension_password` to also get the SIP password back, `extension_user_add` to link a user) |
 | `extension-details` | `extension_view` |
 | `extension-list` | `extension_view` |
 | `extension-update` | `extension_edit`, plus per field: `caller_id_name` needs `effective_caller_id_name`, `outbound_caller_id_name`, `emergency_caller_id_name`; `caller_id_number` the same three `*_number` permissions; `enabled` needs `extension_enabled`; `user_uuid` needs `extension_user_add` (`extension_user_delete` for `null`) |
@@ -100,6 +100,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 ## Upgrading from earlier versions
 
 From 1.0.0:
+- `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
 - `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
 
 Version 1.0.0 is the first release. Coming from the AccelerateNetworks code, or from a checkout older than 1.0.0, note that it changes how keys work:
@@ -150,16 +151,17 @@ List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_pa
 
 ## `extension-create`
 
-| Parameter     | Required | Description |
-|---------------|----------|-------------|
-| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
-| `extension`   | yes      | Extension (number) to create |
-| `caller_id_name` | no    | Caller ID name to set for outbound calls from the extension |
-| `caller_id_number` | no  | Caller ID number to set for outbound calls from the extension |
+| Parameter          | Required | Description |
+|--------------------|----------|-------------|
+| `domain_uuid`      | no  | Domain to act on. Defaults to the key user's domain |
+| `extension`        | yes | Extension number to create: digits, `*`, `#`, optional leading `+` |
+| `caller_id_name`   | no  | Effective, outbound and emergency caller ID name. One line, up to 255 characters |
+| `caller_id_number` | no  | Effective, outbound and emergency caller ID number (digits, `*`, `#`, optional leading `+`) |
+| `user_uuid`        | no  | User of the domain to link the extension to (needs `extension_user_add`) |
 
-create an extension
+Create an extension and its voicemail box (ZuluCall's `createExtension`). Answers `201` with the extension's details, plus its SIP `password` when the key user has `extension_password`.
 
-Returns the extension's details, plus its SIP `password` when the key user has `extension_password`.
+A number that already exists in the domain returns `409 {"error": "extension already exists"}`, a `user_uuid` outside the domain returns `404 {"error": "user not found"}`, an invalid value returns `400 {"error": "invalid <parameter>"}`, and linking a user without `extension_user_add` returns `403` with `missing_permissions`.
 
 ## `extension-details`
 

@@ -39,8 +39,7 @@ function do_action($body) {
     if(!is_uuid($body->extension_uuid)) {
         return array("error" => "invalid extension_uuid", "code" => 400);
     }
-    // the name ends up in the directory and SIP headers: one line of text
-    if(isset($body->caller_id_name) && (!is_string($body->caller_id_name) || strlen($body->caller_id_name) > 255 || preg_match('/[\x00-\x1F\x7F]/', $body->caller_id_name))) {
+    if(isset($body->caller_id_name) && !rest_api_is_caller_id_name($body->caller_id_name)) {
         return array("error" => "invalid caller_id_name", "code" => 400);
     }
     // an empty number clears it, as extension-create leaves it

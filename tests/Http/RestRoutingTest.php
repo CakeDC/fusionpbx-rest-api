@@ -12,8 +12,10 @@ class RestRoutingTest extends RestApiTestCase
 			'outside.php' => $marker,
 			'app/outside.php' => $marker,
 			// an app exposing an action through its own app_api.php mapping
-			'app/call_stats/app_api.php' => '<?php $app_api["call_stats"]["call-stats"] = "api/stats.php";',
+			'app/call_stats/app_api.php' => '<?php $app_api["call_stats"]["call-stats"] = "api/stats.php"; $app_api["call_stats"]["call-stats-broken"] = "api/broken.php";',
 			'app/call_stats/api/stats.php' => '<?php $required_params = array(); $required_permissions = array(); function do_action($body) { return array("calls" => 42); }',
+			// an app action reporting an error without a status code
+			'app/call_stats/api/broken.php' => '<?php $required_params = array(); $required_permissions = array(); function do_action($body) { return array("error" => "stats unavailable"); }',
 			// an app without an API
 			'app/no_api/index.php' => '<?php',
 			// an app whose mapping points outside its own directory
@@ -136,13 +138,22 @@ class RestRoutingTest extends RestApiTestCase
 
 	public function testReturnsServerErrorWhenAnActionFailsWithoutAStatusCode(): void
 	{
+		$response = $this->api(array('app' => 'call_stats', 'action' => 'call-stats-broken'));
+
+		$this->assertSame(500, $response['status']);
+		$this->assertSame(array('error' => 'stats unavailable'), $this->json($response));
+	}
+
+	// createExtension (#43975): an existing number is a conflict, not a server error
+	public function testAnswersConflictForAnExistingExtension(): void
+	{
 		\FakeStore::update(function (&$state) {
 			$state['tables']['v_extensions'][] = array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '100');
 		});
 
 		$response = $this->api(array('action' => 'extension-create', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '100'));
 
-		$this->assertSame(500, $response['status']);
+		$this->assertSame(409, $response['status']);
 		$this->assertSame(array('error' => 'extension already exists'), $this->json($response));
 	}
 }
