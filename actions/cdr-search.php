@@ -96,7 +96,8 @@ function do_action($body) {
         if($missed === null) {
             return array("error" => "invalid missed", "code" => 400);
         }
-        $where[] = "c.missed_call = ".($missed ? "true" : "false");
+        // boolean on Postgres, text on sqlite and mysql: 'true' matches both
+        $where[] = "c.missed_call = ".$bind($missed ? "true" : "false");
     }
 
     if(isset($body->counterparty)) {
@@ -167,10 +168,16 @@ function do_action($body) {
     if($total === false) {
         return array("error" => "database error", "code" => 500);
     }
+    $pagination = array("page" => $page, "per_page" => $per_page, "total" => (int)$total);
+    // past the last page: nothing to sort and skip
+    $offset = ($page - 1) * $per_page;
+    if($offset >= $pagination["total"]) {
+        return array("data" => array(), "pagination" => $pagination);
+    }
 
     $sql = "SELECT c.".implode(", c.", REST_API_CDR_FIELDS)." FROM v_xml_cdr c WHERE ".$where;
     $sql .= " ORDER BY c.start_stamp ".$sorts[$sort].", c.xml_cdr_uuid ".$sorts[$sort];
-    $sql .= " LIMIT ".$per_page." OFFSET ".(($page - 1) * $per_page);
+    $sql .= " LIMIT ".$per_page." OFFSET ".$offset;
     $rows = $database->select($sql, $parameters, 'all');
     if(!is_array($rows)) {
         return array("error" => "database error", "code" => 500);
@@ -178,6 +185,6 @@ function do_action($body) {
 
     return array(
         "data" => array_map("rest_api_format_cdr", $rows),
-        "pagination" => array("page" => $page, "per_page" => $per_page, "total" => (int)$total),
+        "pagination" => $pagination,
     );
 }

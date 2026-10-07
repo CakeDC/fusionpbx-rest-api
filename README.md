@@ -198,9 +198,9 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 | `start_date`     | no | Calls that started at or after this ISO 8601 date-time (UTC without an offset). A date alone (`2026-09-01`) means 00:00 UTC of that day |
 | `end_date`       | no | Calls that started at or before this date-time. A date alone includes the whole day (UTC). Not before `start_date` |
 | `direction`      | no | `inbound`, `outbound` or `local` |
-| `extension_uuid` | no | Comma-separated string or array of extension uuids. Calls where any leg belongs to one of them, so the extension that received a call sees it as well as the one that made it. Each call is returned once |
+| `extension_uuid` | no | Comma-separated string or array of up to 100 extension uuids. Calls where any leg belongs to one of them, so the extension that received a call sees it as well as the one that made it. Each call is returned once |
 | `counterparty`   | no | Text (up to 64 characters) the caller or destination number contains. `%` and `_` are plain characters |
-| `own_number`     | no | Comma-separated string or array of the viewer's own numbers. With `counterparty`, only the other party is searched: the destination when the caller is one of them, else the caller when the destination is one of them, else both |
+| `own_number`     | no | Comma-separated string or array of up to 100 of the viewer's own numbers. With `counterparty`, only the other party is searched: the destination when the caller is one of them, else the caller when the destination is one of them, else both |
 | `missed`         | no | `true` for missed calls only, `false` to leave them out |
 | `calls_only`     | no | `true` (default): one row per call. `false`: one row per leg |
 | `sort`           | no | `-start_stamp` (default, newest first) or `start_stamp` |

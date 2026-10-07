@@ -161,6 +161,31 @@ class CdrSearchTest extends ActionTestCase
 		$this->assertSame(array('page' => 4, 'per_page' => 3, 'total' => 7), $beyond['pagination']);
 	}
 
+	// past the last page the count is enough: no need to sort and skip every row
+	public function testOnlyCountsPastTheLastPage(): void
+	{
+		$this->search(array('page' => 1000000, 'per_page' => 200));
+
+		$queries = $this->state()['queries'];
+		$this->assertCount(1, $queries);
+		$this->assertStringStartsWith('SELECT COUNT(*)', $queries[0]['sql']);
+	}
+
+	// missed_call is boolean on Postgres but text on sqlite and mysql. a bound
+	// 'true'/'false' matches both, a boolean literal only the first
+	public function testBindsMissedAsText(): void
+	{
+		$this->search(array('missed' => true));
+		$this->search(array('missed' => 0));
+
+		$queries = $this->state()['queries'];
+		$this->assertCount(4, $queries);
+		$this->assertStringNotContainsString('missed_call = true', $queries[0]['sql']);
+		$this->assertStringNotContainsString('missed_call = false', $queries[2]['sql']);
+		$this->assertContains('true', $queries[0]['parameters']);
+		$this->assertContains('false', $queries[2]['parameters']);
+	}
+
 	public function testOnlyReturnsCallsOfTheRequestedDomain(): void
 	{
 		$other = $this->search(array('domain_uuid' => S::OTHER_DOMAIN_UUID, 'calls_only' => false));
@@ -187,6 +212,8 @@ class CdrSearchTest extends ActionTestCase
 			array('counterparty', str_repeat('1', 65)),
 			array('own_number', array()),
 			array('own_number', array(array('1001'))),
+			array('own_number', range(1001, 1101)),
+			array('extension_uuid', array_map(function ($n) { return sprintf('00000000-0000-4000-8000-%012d', $n); }, range(1, 101))),
 			array('missed', 'maybe'),
 			array('calls_only', 'yes'),
 			array('sort', 'duration'),

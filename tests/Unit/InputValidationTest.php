@@ -78,6 +78,14 @@ class InputValidationTest extends TestCase
 		}
 	}
 
+	// each item becomes a placeholder, several times over, and Postgres
+	// takes at most 65535 per query
+	public function testParseListRejectsMoreThanAHundredItems(): void
+	{
+		$this->assertCount(100, rest_api_parse_list(range(1, 100)));
+		$this->assertFalse(rest_api_parse_list(implode(',', range(1, 101))));
+	}
+
 	public function testParseBool(): void
 	{
 		foreach (array(true, 1, '1', 'true') as $value) {

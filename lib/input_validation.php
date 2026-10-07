@@ -21,7 +21,8 @@ function is_dial_number($value) {
 }
 
 // a list given as a JSON array or a comma-separated string (#43937). false
-// when it isn't one, or has no items
+// when it isn't one, or has no items or more than 100. each item becomes
+// several placeholders, and Postgres takes at most 65535 per query
 function rest_api_parse_list($value) {
     if(is_string($value)) {
         $value = explode(",", $value);
@@ -39,7 +40,8 @@ function rest_api_parse_list($value) {
             $items[] = $item;
         }
     }
-    return $items ? array_values(array_unique($items)) : false;
+    $items = array_values(array_unique($items));
+    return $items && count($items) <= 100 ? $items : false;
 }
 
 // true/false, "true"/"false", 1/0 or "1"/"0". null when it is none of them
