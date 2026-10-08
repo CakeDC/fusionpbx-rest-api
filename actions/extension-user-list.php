@@ -3,11 +3,14 @@ $required_params = array("user_uuid");
 $required_permissions = array("extension_view", "user_view");
 
 // a user can be linked to several extensions (v_extension_users), so all of
-// them are returned, by number. FusionPBX has no primary extension (#43936)
+// them are returned, by number. FusionPBX has no primary extension
 function do_action($body) {
     if(!is_uuid($body->user_uuid)) {
         return array("error" => "invalid user_uuid", "code" => 400);
     }
+    // FusionPBX stores uuids in lower case; lower-cased like domain_uuid so
+    // text columns (sqlite, mysql) match an upper-case uuid too
+    $body->user_uuid = strtolower($body->user_uuid);
 
     $database = new database;
     $parameters['domain_uuid'] = $body->domain_uuid;
@@ -35,6 +38,6 @@ function do_action($body) {
     if(!is_array($extensions)) {
         return array("error" => "database error", "code" => 500);
     }
-    // ZuluCall's listUserExtensions contract wraps the list in "data"
+
     return array("data" => array_map("rest_api_format_user_extension", $extensions));
 }

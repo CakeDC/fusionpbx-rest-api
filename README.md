@@ -191,7 +191,7 @@ A user without extensions returns `{"data": []}`. A user that is not in the doma
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 | `user_uuid`   | yes | FusionPBX user to look up |
 
-Return one FusionPBX user (ZuluCall's `getUser`), to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
+Return one FusionPBX user (ZuluCall's `getUser`), to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`. Without `user_uuid` the request is refused before the action runs, with `400 {"error": {"error": "missing required parameter(s)", "missing_parameters": ["user_uuid"]}}` like every action's missing parameters. The uuid may be in upper or lower case.
 
 ## `user-list`
 | Parameter     | Required | Description |
