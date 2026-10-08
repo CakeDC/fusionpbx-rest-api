@@ -1,14 +1,13 @@
 <?php
 $required_params = array("number");
 // FusionPBX's destinations class grants itself the dialplan permissions for
-// the moment; the plugin never grants permissions (#43940), and delete()
+// the moment; the plugin never grants permissions, and delete()
 // silently skips a table without one, so they are required
 $required_permissions = array("destination_delete", "dialplan_delete", "dialplan_detail_delete");
 
-// ZuluCall's deleteDestination (#43978). deletes what 5.6.5's
-// destinations::delete() deletes: the destination, its dialplan and the
-// dialplan's details. that class checks the browser's CSRF token, so it can't
-// be called from here
+// Deletes what 5.6.5's destinations::delete() deletes: the destination,
+// its dialplan and the dialplan's details. that class checks the browser's
+// CSRF token, so it can't be called from here
 function do_action($body) {
     if(!(is_string($body->number) || is_int($body->number)) || !preg_match('/^\+?[0-9]+$/D', (string)$body->number)) {
         return array("error" => "invalid number", "code" => 400);

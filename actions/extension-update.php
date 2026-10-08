@@ -2,10 +2,9 @@
 $required_params = array("extension_uuid");
 $required_permissions = array("extension_edit");
 
-// ZuluCall's updateExtension (#43972). fields that are left out stay as they
-// are. like FusionPBX's extension_edit.php, each field needs the permission of
-// the columns it writes; save() would silently skip them, so a missing one
-// refuses the whole update instead
+// Fields that are left out stay as they are. Like FusionPBX's extension_edit.php,
+// each field needs the permission of the columns it writes; save() would silently
+// skip them, so a missing one refuses the whole update instead
 function do_action($body) {
     $caller_id_columns = array(
         "caller_id_name" => array("effective_caller_id_name", "outbound_caller_id_name", "emergency_caller_id_name"),

@@ -5,8 +5,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * ringgroup-details (#43980): ZuluCall's getRingGroup, the same RingGroup
- * ringgroup-list returns.
+ * ringgroup-details: one ring group, as ringgroup-list returns it.
  */
 #[RunTestsInSeparateProcesses]
 class RingGroupDetailsTest extends ActionTestCase

@@ -6,7 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * extension-update (#43972): ZuluCall's updateExtension. Like FusionPBX's
+ * extension-update. Like FusionPBX's
  * extension_edit.php, each field needs the permission of the columns it writes.
  */
 #[RunTestsInSeparateProcesses]

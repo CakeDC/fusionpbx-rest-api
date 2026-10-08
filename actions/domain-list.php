@@ -2,9 +2,8 @@
 $required_params = array();
 $required_permissions = array("domain_view");
 
-// ZuluCall's listDomains (#43969). every domain only for users with
-// domain_select, the same rule rest.php applies to domain_uuid; others get
-// their own domain
+// Every domain only for users with domain_select, the same rule
+// rest.php applies to domain_uuid; others get their own domain
 function do_action($body, $context = array()) {
     $pagination = rest_api_parse_pagination($body);
     if(isset($pagination["error"])) {

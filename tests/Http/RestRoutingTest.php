@@ -155,7 +155,7 @@ class RestRoutingTest extends RestApiTestCase
 		$this->assertSame(array('error' => 'stats unavailable'), $this->json($response));
 	}
 
-	// createExtension (#43975): an existing number is a conflict, not a server error
+	// extension-create: an existing number is a conflict, not a server error
 	public function testAnswersConflictForAnExistingExtension(): void
 	{
 		\FakeStore::update(function (&$state) {

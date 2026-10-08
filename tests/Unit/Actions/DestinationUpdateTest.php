@@ -6,7 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * destination-update (#43977): ZuluCall's updateDestination. A new target
+ * destination-update. A new target
  * replaces the destination's actions in v_destinations, in the dialplan XML
  * and in its action details; everything else FusionPBX put in the dialplan
  * stays as it is.

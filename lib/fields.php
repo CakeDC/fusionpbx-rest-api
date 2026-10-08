@@ -1,6 +1,6 @@
 <?php
-// the columns each action returns, so secrets and columns FusionPBX adds later
-// never leak through the API (#43940)
+// The columns each action returns, so secrets and columns FusionPBX adds later
+// never leak through the API
 
 const REST_API_EXTENSION_FIELDS = array(
     "extension_uuid",
@@ -62,7 +62,6 @@ const REST_API_EXTENSION_FIELDS = array(
     "update_user"
 );
 
-// extension-user-list: the Extension of the ZuluCall contract (#43936)
 const REST_API_USER_EXTENSION_FIELDS = array(
     "extension_uuid",
     "extension",
@@ -107,11 +106,11 @@ const REST_API_RING_GROUP_DESTINATION_FIELDS = array(
     "destination_enabled"
 );
 
-// ZuluCall's RingGroup (#43979) from v_ring_groups rows (ring_group_uuid,
-// domain_uuid, ring_group_name, ring_group_extension, ring_group_strategy),
-// with the destinations of all of them read in one query. destinations are
-// in FusionPBX's order, by delay (a number, sorted here so text and numeric
-// columns agree) then number. false on a database error
+// From v_ring_groups rows (ring_group_uuid, domain_uuid, ring_group_name,
+// ring_group_extension, ring_group_strategy), with the destinations of all
+// of them read in one query. destinations are in FusionPBX's order, by delay
+// (a number, sorted here so text and numeric columns agree) then number.
+// false on a database error
 function rest_api_format_ring_groups($database, array $rows) {
     $destinations = array();
     if($rows) {
@@ -158,14 +157,12 @@ const REST_API_DOMAIN_FIELDS = array(
     "domain_description"
 );
 
-// ZuluCall's Domain (listDomains, #43969)
 const REST_API_DOMAIN_LIST_FIELDS = array(
     "domain_uuid",
     "domain_name",
     "domain_enabled"
 );
 
-// ZuluCall's PbxUser (listUsers, #43970). never password, salt or api_key
 const REST_API_USER_FIELDS = array(
     "user_uuid",
     "domain_uuid",
@@ -173,7 +170,6 @@ const REST_API_USER_FIELDS = array(
     "user_enabled"
 );
 
-// destination_actions is JSON-encoded in the database. return it parsed (#5)
 function rest_api_decode_destination($destination) {
     if($destination && !empty($destination['destination_actions'])) {
         $destination['destination_actions'] = json_decode($destination['destination_actions']);
@@ -181,10 +177,10 @@ function rest_api_decode_destination($destination) {
     return $destination;
 }
 
-// ZuluCall's Destination (#43976) from v_destinations rows. FusionPBX stores
-// a route as transfer actions, "<number> XML <context>" (voicemail: "*99<box>"),
-// so destination_type and target come from what the number is in the domain.
-// a route with anything but one such action, or to a number none of the four
+// From v_destinations rows. FusionPBX stores a route as transfer actions,
+// "<number> XML <context>" (voicemail: "*99<box>"), so destination_type and
+// target come from what the number is in the domain.
+// A route with anything but one such action, or to a number none of the four
 // types owns, gets null for both. false on a database error
 function rest_api_format_destinations($database, $domain_uuid, array $rows) {
     $numbers = array();
@@ -311,7 +307,7 @@ function rest_api_destination_transfer_data($database, $domain_uuid, $type, $tar
     }
 }
 
-// a destination action as FusionPBX's destination_edit.php writes it in the
+// A destination action as FusionPBX's destination_edit.php writes it in the
 // dialplan XML (xml::sanitize(), keeping ${regex} and ${sofia_contact})
 function rest_api_dialplan_action_xml($app, $data) {
     $allowed = array("regex", "sofia_contact");
@@ -330,7 +326,7 @@ function rest_api_xml_sanitize($value) {
     return htmlspecialchars(preg_replace('/\$\{[^}]+\}/', '', (string)$value), ENT_XML1);
 }
 
-// cdr-search and cdr-details: the Cdr of the ZuluCall contract (#43937)
+// cdr-search and cdr-details
 const REST_API_CDR_FIELDS = array(
     "xml_cdr_uuid",
     "direction",

@@ -2,11 +2,11 @@
 $required_params = array("ring_group_uuid");
 $required_permissions = array("ring_group_edit");
 
-// ZuluCall's updateRingGroup (#43981). fields that are left out stay as they
-// are; the extension can't be changed. FusionPBX rings destinations by delay,
-// then number, and the contract's destinations are only numbers, so the list
-// sets which numbers ring: those already in the ring group keep their delay,
-// timeout and settings, new ones get ringgroup-create's defaults
+// Fields that are left out stay as they are; the extension can't be changed.
+// FusionPBX rings destinations by delay, then number, and the API's
+// destinations are only numbers, so the list sets which numbers ring: those
+// already in the ring group keep their delay, timeout and settings,
+// new ones get ringgroup-create's defaults
 function do_action($body) {
     $strategies = array("simultaneous", "sequence", "enterprise", "rollover", "random");
     $set_destinations = isset($body->destinations);

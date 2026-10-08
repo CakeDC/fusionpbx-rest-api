@@ -2,8 +2,8 @@
 $required_params = array();
 $required_permissions = array("destination_view");
 
-// ZuluCall's listDestinations (#43976): the domain's inbound numbers by
-// number, with what each one routes to (rest_api_format_destinations())
+// The domain's inbound numbers by number, with what
+// each one routes to (rest_api_format_destinations())
 function do_action($body) {
     $pagination = rest_api_parse_pagination($body);
     if(isset($pagination["error"])) {

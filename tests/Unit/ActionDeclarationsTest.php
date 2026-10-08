@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Every action declares the FusionPBX permissions rest.php checks before running
- * it (#43940). FusionPBX's save() silently skips tables the user can't add to,
+ * it. FusionPBX's save() silently skips tables the user can't add to,
  * so the list must cover every table the action saves.
  */
 #[RunTestsInSeparateProcesses]

@@ -5,8 +5,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * destination-delete (#43978): ZuluCall's deleteDestination. Deletes what
- * 5.6.5's destinations::delete() deletes: the destination, its dialplan and
+ * destination-delete deletes what 5.6.5's
+ * destinations::delete() deletes: the destination, its dialplan and
  * the dialplan's details.
  */
 #[RunTestsInSeparateProcesses]

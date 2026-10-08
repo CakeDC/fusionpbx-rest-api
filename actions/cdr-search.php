@@ -2,18 +2,18 @@
 $required_params = array();
 $required_permissions = array("xml_cdr_view");
 
-// ZuluCall's call history (#43937): filtered, paginated CDRs, by default one
+// Call history: filtered, paginated CDRs, by default one
 // row per call. cdr-list stays as it was for older clients.
 //
 // FusionPBX doesn't give both legs of a call the same id: an "a" leg's
 // bridge_uuid is the xml_cdr_uuid of its "b" leg, and a "b" leg's
-// originating_leg_uuid is the xml_cdr_uuid of its "a" leg. a call is shown
+// originating_leg_uuid is the xml_cdr_uuid of its "a" leg. A call is shown
 // as its "a" leg or, when that isn't in the domain, as the earliest of the
 // "b" legs that share an originating_leg_uuid. bridge_uuid is a text column
 // and the other ids are uuid, so they are compared as text
 function do_action($body) {
     $parameters = array();
-    // every value gets its own placeholder, so none is used twice in a query
+    // Every value gets its own placeholder, so none is used twice in a query
     $bind = function($value) use (&$parameters) {
         $name = "p".count($parameters);
         $parameters[$name] = $value;
@@ -36,12 +36,12 @@ function do_action($body) {
     }
 
     $where = array("c.domain_uuid = ".$bind($body->domain_uuid));
-    // the domain's legs, for the subqueries
+    // The domain's legs, for the subqueries
     $domain_legs = function($alias, $condition = "") use ($bind, $body) {
         return " FROM v_xml_cdr ".$alias." WHERE ".$alias.".domain_uuid = ".$bind($body->domain_uuid).$condition;
     };
     if($calls_only) {
-        // a "b" leg is the main leg only when no "a" leg of the domain
+        // A "b" leg is the main leg only when no "a" leg of the domain
         // originated it or was bridged to it, and no sibling started earlier.
         // FusionPBX indexes only xml_cdr_uuid: lookups by it are correlated,
         // bridge_uuid is matched against a set Postgres hashes once per query
@@ -67,7 +67,7 @@ function do_action($body) {
         if($end === false) {
             return array("error" => "invalid end_date", "code" => 400);
         }
-        // a date alone includes that whole day
+        // A date alone includes that whole day
         if($end[1]) {
             $end_exclusive = $end[0]->modify("+1 day");
             $invalid = $start && $start[0] >= $end_exclusive;
@@ -93,7 +93,7 @@ function do_action($body) {
         if($missed === null) {
             return array("error" => "invalid missed", "code" => 400);
         }
-        // boolean on Postgres, text on sqlite and mysql: 'true' matches both
+        // Boolean on Postgres, text on sqlite and mysql: 'true' matches both
         $where[] = "c.missed_call = ".$bind($missed ? "true" : "false");
     }
 
@@ -109,14 +109,14 @@ function do_action($body) {
             if($own === false) {
                 return array("error" => "invalid own_number", "code" => 400);
             }
-            // each use binds the numbers again, as a placeholder can't be repeated
+            // Each use binds the numbers again, as a placeholder can't be repeated
             $in_own = function($column) use ($own, $bind) {
                 return $column." IN (".implode(", ", array_map($bind, $own)).")";
             };
             $not_own = function($column) use ($in_own) {
                 return "(".$column." IS NULL OR NOT ".$in_own($column).")";
             };
-            // only the other party: the destination when the viewer called,
+            // Only the other party: the destination when the viewer called,
             // the caller when the viewer was called, else either
             $where[] = "(("
                 .$in_own("c.caller_id_number")." AND ".$destination_matches.") OR ("
@@ -135,12 +135,12 @@ function do_action($body) {
         if($extensions === false || count(array_filter($extensions, "is_uuid")) !== count($extensions)) {
             return array("error" => "invalid extension_uuid", "code" => 400);
         }
-        // a column of the domain's legs that belong to one of the extensions
+        // A column of the domain's legs that belong to one of the extensions
         $of_extensions = function($column) use ($domain_legs, $extensions, $bind) {
             return "(SELECT ".$column.$domain_legs("l", " AND l.extension_uuid IN (".implode(", ", array_map($bind, $extensions)).")").")";
         };
-        // any leg of the call: the row itself, its "b" legs, the leg it was
-        // bridged to and, for a "b" leg shown as the call, its siblings. the
+        // Any leg of the call: the row itself, its "b" legs, the leg it was
+        // bridged to and, for a "b" leg shown as the call, its siblings. The
         // same legs cdr-details returns. sets, so Postgres hashes each once
         $any_leg = array(
             "c.extension_uuid IN (".implode(", ", array_map($bind, $extensions)).")",
@@ -150,7 +150,7 @@ function do_action($body) {
         if($calls_only) {
             $any_leg[] = "((c.leg IS NULL OR c.leg <> 'a') AND c.originating_leg_uuid IN ".$of_extensions("l.originating_leg_uuid").")";
         } else {
-            // a leg listed alone matches through its "a" leg and its siblings too
+            // A leg listed alone matches through its "a" leg and its siblings too
             $any_leg[] = "c.originating_leg_uuid IN ".$of_extensions("l.xml_cdr_uuid");
             $any_leg[] = "CAST(c.xml_cdr_uuid AS text) IN ".$of_extensions("l.bridge_uuid");
             $any_leg[] = "c.originating_leg_uuid IN ".$of_extensions("l.originating_leg_uuid");
@@ -166,7 +166,7 @@ function do_action($body) {
         return array("error" => "database error", "code" => 500);
     }
     $pagination = array("page" => $page, "per_page" => $per_page, "total" => (int)$total);
-    // past the last page: nothing to sort and skip
+    // Past the last page: nothing to sort and skip
     $offset = ($page - 1) * $per_page;
     if($offset >= $pagination["total"]) {
         return array("data" => array(), "pagination" => $pagination);

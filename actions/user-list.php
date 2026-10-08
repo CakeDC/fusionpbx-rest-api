@@ -2,8 +2,8 @@
 $required_params = array();
 $required_permissions = array("user_view");
 
-// ZuluCall's listUsers (#43970): the FusionPBX users of a domain, disabled
-// ones included, to pick the user of an identity mapping (#43389)
+// The FusionPBX users of a domain, disabled ones included,
+// to pick a FusionPBX user
 function do_action($body) {
     $pagination = rest_api_parse_pagination($body);
     if(isset($pagination["error"])) {
@@ -19,7 +19,7 @@ function do_action($body) {
         return array("error" => "database error", "code" => 500);
     }
     $pagination = array("page" => $page, "per_page" => $per_page, "total" => (int)$total);
-    // past the last page: nothing to sort and skip
+    // Past the last page: nothing to sort and skip
     $offset = ($page - 1) * $per_page;
     if($offset >= $pagination["total"]) {
         return array("data" => array(), "pagination" => $pagination);

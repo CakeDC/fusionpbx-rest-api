@@ -6,8 +6,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * destination-list (#43976): ZuluCall's listDestinations. FusionPBX stores a
- * route as transfer actions ("<number> XML <context>"); the contract's
+ * destination-list. FusionPBX stores a route as transfer actions
+ * ("<number> XML <context>"); the response's
  * destination_type and target come from what that number is in the domain.
  */
 #[RunTestsInSeparateProcesses]

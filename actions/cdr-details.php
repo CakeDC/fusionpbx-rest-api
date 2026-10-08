@@ -3,7 +3,7 @@
 $required_params = array();
 $required_permissions = array("xml_cdr_view");
 
-// one call with every leg (#43937). any leg's xml_cdr_uuid finds it. legs are
+// One call with every leg. Any leg's xml_cdr_uuid finds it. legs are
 // linked as in cdr-search: a.bridge_uuid = b.xml_cdr_uuid, or
 // b.originating_leg_uuid = a.xml_cdr_uuid
 function do_action($body) {
@@ -36,7 +36,7 @@ function do_action($body) {
         return array("error" => "call not found", "code" => 404);
     }
 
-    // the main leg: the "a" leg, else the earliest leg sharing its originating_leg_uuid
+    // The main leg: the "a" leg, else the earliest leg sharing its originating_leg_uuid
     $main = $found[0];
     if($main['leg'] !== "a") {
         $a = $main['originating_leg_uuid'] ? $find("c.leg = 'a' AND c.xml_cdr_uuid = :uuid", $main['originating_leg_uuid']) : array();

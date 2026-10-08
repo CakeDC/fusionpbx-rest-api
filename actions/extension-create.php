@@ -1,8 +1,8 @@
 <?php
 $required_params = array("extension");
 $required_permissions = array("extension_add", "voicemail_add");
-// ZuluCall's createExtension (#43975): 201 with the extension, 409 when the
-// number exists in the domain. user_uuid links the new extension to a user
+// 201 with the extension, 409 when the number exists in the domain.
+// user_uuid links the new extension to a user
 function do_action($body) {
     $user_uuid = isset($body->user_uuid) ? $body->user_uuid : null;
     // save() would silently skip the link without extension_user_add

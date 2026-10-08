@@ -20,7 +20,7 @@ function is_dial_number($value) {
     return (is_string($value) || is_int($value)) && preg_match('/^\+?[0-9*#]+$/D', (string)$value) === 1;
 }
 
-// a list given as a JSON array or a comma-separated string (#43937). false
+// a list given as a JSON array or a comma-separated string. false
 // when it isn't one, or has no items or more than 100. each item becomes
 // several placeholders, and Postgres takes at most 65535 per query
 function rest_api_parse_list($value) {

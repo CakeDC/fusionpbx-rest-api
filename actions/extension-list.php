@@ -2,8 +2,8 @@
 $required_params = array();
 $required_permissions = array("extension_view");
 
-// ZuluCall's listExtensions (#43974): the domain's extensions as the same
-// Extension objects extension-user-list returns, by number (as text)
+// The domain's extensions as the same Extension objects
+// extension-user-list returns, by number (as text)
 function do_action($body) {
     $pagination = rest_api_parse_pagination($body);
     if(isset($pagination["error"])) {
@@ -33,7 +33,7 @@ function do_action($body) {
     }
 
     // an extension can be linked to several users (v_extension_users) and
-    // the contract has room for one: the lowest user_uuid, so it is stable
+    // the response has room for one: the lowest user_uuid, so it is stable
     $users = array();
     if($extensions) {
         $placeholders = array();

@@ -6,7 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * ringgroup-update (#43981): ZuluCall's updateRingGroup.
+ * ringgroup-update.
  */
 #[RunTestsInSeparateProcesses]
 class RingGroupUpdateTest extends ActionTestCase

@@ -5,7 +5,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * extension-delete (#43973): ZuluCall's deleteExtension. Deletes what 5.6.5's
+ * extension-delete deletes what 5.6.5's
  * extension class deletes with "delete extension and voicemail".
  */
 #[RunTestsInSeparateProcesses]

@@ -6,8 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * user-list (#43970): ZuluCall's listUsers, used to pick the FusionPBX user of
- * an identity mapping (#43389).
+ * user-list: the FusionPBX users of a domain.
  */
 #[RunTestsInSeparateProcesses]
 class UserListTest extends ActionTestCase

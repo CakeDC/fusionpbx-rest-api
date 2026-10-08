@@ -2,8 +2,8 @@
 $required_params = array("ring_group_uuid");
 $required_permissions = array("ring_group_view", "ring_group_destination_view");
 
-// ZuluCall's getRingGroup (#43980): one ring group of the domain, disabled or
-// not, as ringgroup-list returns it (rest_api_format_ring_groups())
+// One ring group of the domain, disabled or not, as ringgroup-list
+// returns it (rest_api_format_ring_groups())
 function do_action($body) {
     if(!is_uuid($body->ring_group_uuid)) {
         return array("error" => "invalid ring_group_uuid", "code" => 400);

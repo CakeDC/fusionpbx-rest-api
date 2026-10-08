@@ -5,8 +5,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * user-details: getUser used by the identity mapping to check that
- * a stored domain_uuid + user_uuid pair still resolves to a FusionPBX user.
+ * user-details: checks that a stored domain_uuid + user_uuid pair still
+ * resolves to a FusionPBX user.
  */
 #[RunTestsInSeparateProcesses]
 class UserDetailsTest extends ActionTestCase
@@ -85,7 +85,7 @@ class UserDetailsTest extends ActionTestCase
 	}
 
 	// FusionPBX's select() returns false on a database error, which must not
-	// look like a deleted user to the identity mapping
+	// look like a deleted user
 	public function testAnswers500WhenTheDatabaseFails(): void
 	{
 		$this->failSelects();

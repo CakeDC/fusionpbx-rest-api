@@ -2,7 +2,7 @@
 $required_params = array("user_uuid");
 $required_permissions = array("extension_view", "user_view");
 
-// a user can be linked to several extensions (v_extension_users), so all of
+// A user can be linked to several extensions (v_extension_users), so all of
 // them are returned, by number. FusionPBX has no primary extension
 function do_action($body) {
     if(!is_uuid($body->user_uuid)) {
@@ -27,7 +27,7 @@ function do_action($body) {
         return array("error" => "user not found", "code" => 404);
     }
 
-    // the join's domain check keeps out links to extensions of another domain.
+    // The join's domain check keeps out links to extensions of another domain.
     // v_extension_users has no unique (user, extension) constraint: DISTINCT
     // drops duplicate links
     $sql = "SELECT DISTINCT e.".implode(", e.", REST_API_USER_EXTENSION_FIELDS).", eu.user_uuid";

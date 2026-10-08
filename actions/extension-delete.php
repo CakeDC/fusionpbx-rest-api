@@ -1,7 +1,7 @@
 <?php
 $required_params = array("extension_uuid");
 // FusionPBX's extension class grants itself the child tables' delete
-// permissions for the moment; the plugin never grants permissions (#43940),
+// permissions for the moment; the plugin never grants permissions,
 // and delete() silently skips a table without one, so all are required
 $required_permissions = array(
     "extension_delete", "extension_user_delete", "follow_me_delete", "follow_me_destination_delete",
@@ -10,8 +10,8 @@ $required_permissions = array(
     "voicemail_greeting_delete",
 );
 
-// ZuluCall's deleteExtension (#43973). deletes what 5.6.5's "delete extension
-// and voicemail" deletes (app/extensions/resources/classes/extension.php and
+// Deletes what 5.6.5's "delete extension and voicemail" deletes
+// (app/extensions/resources/classes/extension.php and
 // voicemail::voicemail_delete()); those classes check the browser's CSRF
 // token, so they can't be called from here
 function do_action($body) {

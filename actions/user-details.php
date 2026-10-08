@@ -2,7 +2,7 @@
 $required_params = array("user_uuid");
 $required_permissions = array("user_view");
 
-// a stored domain_uuid + user_uuid pair still resolves to a FusionPBX user.
+// A stored domain_uuid + user_uuid pair still resolves to a FusionPBX user.
 // a disabled user is returned too, with user_enabled false
 function do_action($body) {
     if(!is_uuid($body->user_uuid)) {

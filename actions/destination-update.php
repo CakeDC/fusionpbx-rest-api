@@ -2,11 +2,11 @@
 $required_params = array("number");
 $required_permissions = array("destination_edit", "dialplan_edit", "dialplan_detail_add", "dialplan_detail_delete");
 
-// ZuluCall's updateDestination (#43977). FusionPBX's destination_edit.php
-// rebuilds the whole dialplan from every destination setting (recording, fax
-// detection, conditions...); this action only replaces what the contract's
-// fields cover: the actions (a transfer to the new target) and the enabled
-// flag, in v_destinations, the dialplan XML and its action details
+// FusionPBX's destination_edit.php rebuilds the whole dialplan from every
+// destination setting (recording, fax detection, conditions...);
+// this action only replaces what this action's fields cover: the actions
+// (a transfer to the new target) and the enabled flag, in v_destinations,
+// the dialplan XML and its action details
 function do_action($body) {
     if(!(is_string($body->number) || is_int($body->number)) || !preg_match('/^\+?[0-9]+$/D', (string)$body->number)) {
         return array("error" => "invalid number", "code" => 400);

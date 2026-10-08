@@ -6,7 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * extension-create, aligned with ZuluCall's createExtension (#43975).
+ * extension-create.
  */
 #[RunTestsInSeparateProcesses]
 class ExtensionCreateTest extends ActionTestCase

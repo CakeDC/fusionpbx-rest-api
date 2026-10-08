@@ -6,8 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * extension-list (#43974): ZuluCall's listExtensions, paginated Extension
- * objects like extension-user-list returns.
+ * extension-list: paginated extensions, as extension-user-list returns them.
  */
 #[RunTestsInSeparateProcesses]
 class ExtensionListTest extends ActionTestCase

@@ -5,7 +5,7 @@ use RestApi\Test\Support\RestApiTestCase;
 
 /**
  * Requests act on the key user's domain, or on another domain when the user
- * has domain_select (#43940).
+ * has domain_select.
  */
 class RestDomainScopeTest extends RestApiTestCase
 {
@@ -92,7 +92,7 @@ class RestDomainScopeTest extends RestApiTestCase
 		}
 	}
 
-	// domain-list (#43969) lists other domains only for domain_select, the
+	// domain-list lists other domains only for domain_select, the
 	// same rule rest.php applies to domain_uuid
 	public function testDomainListOnlyListsOtherDomainsWithDomainSelect(): void
 	{

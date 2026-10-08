@@ -136,7 +136,7 @@ Creates a new destination in FusionPBX.
 | `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
 | `number`      | yes | Inbound number of the destination to delete |
 
-Delete an inbound destination (ZuluCall's `deleteDestination`) with its dialplan and dialplan details, as FusionPBX's destinations page does, and clear the dialplan cache of its context. Answers `204` with no body. A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, and an invalid number returns `400 {"error": "invalid number"}`.
+Delete an inbound destination with its dialplan and dialplan details, as FusionPBX's destinations page does, and clear the dialplan cache of its context. Answers `204` with no body. A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, and an invalid number returns `400 {"error": "invalid number"}`.
 
 ## `destination-details`
 | Parameter     | Required | Description |
@@ -153,7 +153,7 @@ looks up details for a particular destination
 | `page`        | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List the inbound destinations (DIDs) of a domain, disabled ones included, sorted by number: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 12}}` (ZuluCall's `listDestinations`). Each item has `domain_uuid`, `number`, `destination_type`, `target` and `enabled` (boolean).
+List the inbound destinations (DIDs) of a domain, disabled ones included, sorted by number: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 12}}`. Each item has `domain_uuid`, `number`, `destination_type`, `target` and `enabled` (boolean).
 
 FusionPBX stores a destination as actions such as `transfer 100 XML <domain>`. When a destination has exactly one `transfer` action, its number is looked up in the domain:
 
@@ -175,7 +175,7 @@ Any other destination (a time condition, a call flow, a fax, several actions, a 
 | `target`           | no  | The extension number (or alias), ring group uuid, IVR menu uuid or voicemail box number, in the domain |
 | `enabled`          | no  | `true` or `false` |
 
-Update an inbound destination (ZuluCall's `updateDestination`) and return it as `destination-list` does. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise).
+Update an inbound destination and return it as `destination-list` does. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise).
 
 A new target replaces the destination's actions with one transfer to it (`<number> XML <context>`, `*99<box>` for voicemail): in the destination, in its dialplan's XML and in its dialplan details. Everything else FusionPBX put in the dialplan (recording, hold music, caller ID prefix, conditions...) stays as it is. If the dialplan no longer contains the destination's actions, because it was edited by hand, the update is refused with `409`. `enabled` switches both the destination and its dialplan. The dialplan cache is cleared as FusionPBX's destination page does.
 
@@ -197,7 +197,7 @@ looks up details of a domain. Mostly useful for converting between domain uuid a
 | `page`     | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page` | no | Rows per page, 1 to 200 (default 25) |
 
-List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 2}}` (ZuluCall's `listDomains`). Each item has `domain_uuid`, `domain_name` and `domain_enabled` (boolean). Users with `domain_select` get every domain, disabled ones included; other users only get their own domain. `domain_uuid` is ignored. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 2}}`. Each item has `domain_uuid`, `domain_name` and `domain_enabled` (boolean). Users with `domain_select` get every domain, disabled ones included; other users only get their own domain. `domain_uuid` is ignored. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `extension-create`
 
@@ -209,7 +209,7 @@ List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_pa
 | `caller_id_number` | no  | Effective, outbound and emergency caller ID number (digits, `*`, `#`, optional leading `+`) |
 | `user_uuid`        | no  | User of the domain to link the extension to (needs `extension_user_add`) |
 
-Create an extension and its voicemail box (ZuluCall's `createExtension`). Answers `201` with the extension's details, plus its SIP `password` when the key user has `extension_password`.
+Create an extension and its voicemail box. Answers `201` with the extension's details, plus its SIP `password` when the key user has `extension_password`.
 
 A number that already exists in the domain returns `409 {"error": "extension already exists"}`, a `user_uuid` outside the domain returns `404 {"error": "user not found"}`, an invalid value returns `400 {"error": "invalid <parameter>"}`, and linking a user without `extension_user_add` returns `403` with `missing_permissions`.
 
@@ -220,7 +220,7 @@ A number that already exists in the domain returns `409 {"error": "extension alr
 | `domain_uuid`    | no  | Domain to act on. Defaults to the key user's domain |
 | `extension_uuid` | yes | Extension to delete |
 
-Delete an extension (ZuluCall's `deleteExtension`) and what FusionPBX's "delete extension and voicemail" deletes with it: its user links, follow-me, extension settings, the ring group destinations that dial its number or alias, and the voicemail boxes of its number and numeric alias (options, messages, greetings, copies to other boxes, and the message files on disk). Clears FusionPBX's cached directory entry. Answers `204` with no body.
+Delete an extension and what FusionPBX's "delete extension and voicemail" deletes with it: its user links, follow-me, extension settings, the ring group destinations that dial its number or alias, and the voicemail boxes of its number and numeric alias (options, messages, greetings, copies to other boxes, and the message files on disk). Clears FusionPBX's cached directory entry. Answers `204` with no body.
 
 An extension that doesn't exist or belongs to another domain returns `404 {"error": "extension not found"}`, and a malformed `extension_uuid` returns `400 {"error": "invalid extension_uuid"}`.
 
@@ -244,7 +244,7 @@ get all details of an extension
 | `enabled`          | no  | `true` or `false` |
 | `user_uuid`        | no  | Links the extension to this user of the domain; users already linked stay linked. `null` removes every link |
 
-Update an extension (ZuluCall's `updateExtension`). Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise). Returns the extension with the same columns as `extension-details`, and clears FusionPBX's cached directory entry so the change applies without a reload.
+Update an extension. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise). Returns the extension with the same columns as `extension-details`, and clears FusionPBX's cached directory entry so the change applies without a reload.
 
 Each field needs the permissions of the columns it writes, as in FusionPBX's extension edit page; a missing one refuses the whole update with `403` and `missing_permissions`. An extension or user that doesn't exist in the domain returns `404` (`extension not found`, `user not found`), and an invalid value returns `400 {"error": "invalid <parameter>"}`.
 
@@ -255,7 +255,7 @@ Each field needs the permissions of the columns it writes, as in FusionPBX's ext
 | `page`        | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List the extensions of a domain, disabled ones included, sorted by extension number (as text): `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 42}}` (ZuluCall's `listExtensions`). Each item has the fields of `extension-user-list`: `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`. An extension can be linked to several users; `user_uuid` is the one with the lowest uuid, or `null` when none is linked (use `extension-user-list` for a user's extensions). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List the extensions of a domain, disabled ones included, sorted by extension number (as text): `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 42}}`. Each item has the fields of `extension-user-list`: `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`. An extension can be linked to several users; `user_uuid` is the one with the lowest uuid, or `null` when none is linked (use `extension-user-list` for a user's extensions). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 
 ## `extension-user-list`
@@ -264,7 +264,7 @@ List the extensions of a domain, disabled ones included, sorted by extension num
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 | `user_uuid`   | yes | FusionPBX user whose extensions to list |
 
-List the extensions linked to a user (`v_extension_users`), sorted by extension number (as text), disabled ones included, each once even if linked twice. A user can have several extensions; FusionPBX has no primary one, so the caller picks. Returns `{"data": [...]}` (ZuluCall's `listUserExtensions`). Each item has `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`.
+List the extensions linked to a user (`v_extension_users`), sorted by extension number (as text), disabled ones included, each once even if linked twice. A user can have several extensions; FusionPBX has no primary one, so the caller picks. Returns `{"data": [...]}`. Each item has `extension_uuid`, `extension`, `domain_uuid`, `directory_first_name`, `directory_last_name`, `emergency_caller_id_number`, `outbound_caller_id_number`, `enabled` (boolean) and `user_uuid`.
 
 A user without extensions returns `{"data": []}`. A user that is not in the domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`.
 
@@ -275,7 +275,7 @@ A user without extensions returns `{"data": []}`. A user that is not in the doma
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 | `user_uuid`   | yes | FusionPBX user to look up |
 
-Return one FusionPBX user (ZuluCall's `getUser`), to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`. Without `user_uuid` the request is refused before the action runs, with `400 {"error": {"error": "missing required parameter(s)", "missing_parameters": ["user_uuid"]}}` like every action's missing parameters. The uuid may be in upper or lower case.
+Return one FusionPBX user, to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`. Without `user_uuid` the request is refused before the action runs, with `400 {"error": {"error": "missing required parameter(s)", "missing_parameters": ["user_uuid"]}}` like every action's missing parameters. The uuid may be in upper or lower case.
 
 ## `user-list`
 | Parameter     | Required | Description |
@@ -284,7 +284,7 @@ Return one FusionPBX user (ZuluCall's `getUser`), to check that a stored `domain
 | `page`        | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}` (ZuluCall's `listUsers`). Each item has `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `ringgroup-create`
 | Parameter      | Required | Description |
@@ -303,7 +303,7 @@ Create a ring group
 | `domain_uuid`     | no  | Domain to act on. Defaults to the key user's domain |
 | `ring_group_uuid` | yes | Ring group to look up |
 
-Return one ring group (ZuluCall's `getRingGroup`), enabled or not, as `ringgroup-list` returns it: `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` in the order FusionPBX shows them. A ring group that doesn't exist or belongs to another domain returns `404 {"error": "ring group not found"}`, and a malformed `ring_group_uuid` returns `400 {"error": "invalid ring_group_uuid"}`.
+Return one ring group, enabled or not, as `ringgroup-list` returns it: `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` in the order FusionPBX shows them. A ring group that doesn't exist or belongs to another domain returns `404 {"error": "ring group not found"}`, and a malformed `ring_group_uuid` returns `400 {"error": "invalid ring_group_uuid"}`.
 
 ## `ringgroup-list`
 | Parameter     | Required | Description |
@@ -312,7 +312,7 @@ Return one ring group (ZuluCall's `getRingGroup`), enabled or not, as `ringgroup
 | `page`        | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List the ring groups of a domain, disabled ones included, sorted by extension: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}` (ZuluCall's `listRingGroups`). Each item has `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` (`[{"number": "101"}, ...]`, in the order FusionPBX shows them: by delay, then number). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List the ring groups of a domain, disabled ones included, sorted by extension: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` (`[{"number": "101"}, ...]`, in the order FusionPBX shows them: by delay, then number). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `ringgroup-update`
 | Parameter         | Required | Description |
@@ -323,7 +323,7 @@ List the ring groups of a domain, disabled ones included, sorted by extension: `
 | `strategy`        | no  | `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
 | `destinations`    | no  | JSON array of the numbers to ring, e.g. `[{"number": "101"}, {"number": "102"}]` |
 
-Update a ring group (ZuluCall's `updateRingGroup`) and return it as `ringgroup-details` does. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise). The extension can't be changed. A new name is also written to the ring group's dialplan. The dialplan cache is cleared as FusionPBX's ring group page does.
+Update a ring group and return it as `ringgroup-details` does. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise). The extension can't be changed. A new name is also written to the ring group's dialplan. The dialplan cache is cleared as FusionPBX's ring group page does.
 
 `destinations` sets which numbers ring. FusionPBX rings them by delay, then number, and the list carries only numbers, so numbers already in the ring group keep their delay, timeout and other settings, new ones get `ringgroup-create`'s defaults (no delay, 30 s timeout), and numbers left out are removed. The order of the list doesn't change the ringing order.
 

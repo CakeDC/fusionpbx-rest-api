@@ -145,7 +145,7 @@ class ExtensionUserListTest extends ActionTestCase
 		$this->assertSame(array('error' => 'database error', 'code' => 500), $result);
 	}
 
-	// the contract's enabled is a boolean, whether the column is text or boolean
+	// enabled is a boolean in the response, whether the column is text or boolean
 	public function testReturnsEnabledAsABoolean(): void
 	{
 		foreach (array(array('true', true), array('false', false), array('t', true), array('f', false), array(true, true), array(false, false), array(null, false)) as list($stored, $enabled)) {

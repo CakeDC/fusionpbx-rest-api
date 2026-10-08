@@ -6,7 +6,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * domain-list (#43969): ZuluCall's listDomains. Users with domain_select see
+ * domain-list. Users with domain_select see
  * every domain, others only their own.
  */
 #[RunTestsInSeparateProcesses]

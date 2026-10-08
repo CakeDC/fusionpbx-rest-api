@@ -2,8 +2,8 @@
 $required_params = array();
 $required_permissions = array("ring_group_view", "ring_group_destination_view");
 
-// ZuluCall's listRingGroups (#43979): the domain's ring groups by extension,
-// each with its destinations (rest_api_format_ring_groups())
+// The domain's ring groups by extension, each with its
+// destinations (rest_api_format_ring_groups())
 function do_action($body) {
     $pagination = rest_api_parse_pagination($body);
     if(isset($pagination["error"])) {
