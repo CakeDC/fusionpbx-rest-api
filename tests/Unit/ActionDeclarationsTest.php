@@ -37,6 +37,7 @@ class ActionDeclarationsTest extends TestCase
 		'extension-user-list' => array('extension_view', 'user_view'),
 		'originate' => array('click_to_call_call'),
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
+		'ringgroup-delete' => array('ring_group_delete', 'ring_group_user_delete', 'ring_group_destination_delete', 'dialplan_delete', 'dialplan_detail_delete'),
 		'ringgroup-details' => array('ring_group_view', 'ring_group_destination_view'),
 		'ringgroup-list' => array('ring_group_view', 'ring_group_destination_view'),
 		'ringgroup-update' => array('ring_group_edit'),

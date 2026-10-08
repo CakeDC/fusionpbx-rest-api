@@ -24,6 +24,7 @@ abstract class RestApiTestCase extends HttpTestCase
 		'extension_setting_delete', 'voicemail_delete',
 		'voicemail_option_delete', 'voicemail_message_delete', 'voicemail_destination_delete',
 		'voicemail_greeting_delete',
+		'ring_group_delete', 'ring_group_user_delete',
 	);
 
 	protected function tables(): array

@@ -76,6 +76,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
+| `ringgroup-delete` | `ring_group_delete`, `ring_group_user_delete`, `ring_group_destination_delete`, `dialplan_delete`, `dialplan_detail_delete` |
 | `ringgroup-details` | `ring_group_view`, `ring_group_destination_view` |
 | `ringgroup-list` | `ring_group_view`, `ring_group_destination_view` |
 | `ringgroup-update` | `ring_group_edit`, plus `dialplan_edit` to change `name` and `ring_group_destination_add`, `ring_group_destination_delete` to change `destinations` |
@@ -296,6 +297,14 @@ List the FusionPBX users of a domain, disabled ones included, sorted by username
 | `strategy`     | yes      | one of: `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
 
 Create a ring group
+
+## `ringgroup-delete`
+| Parameter         | Required | Description |
+|-------------------|----------|-------------|
+| `domain_uuid`     | no  | Domain to act on. Defaults to the key user's domain |
+| `ring_group_uuid` | yes | Ring group to delete |
+
+Delete a ring group with its users, destinations, dialplan and dialplan details, as FusionPBX's ring groups page does, and clear the dialplan cache of its context. Answers `204` with no body. A ring group that doesn't exist or belongs to another domain returns `404 {"error": "ring group not found"}`, and a malformed `ring_group_uuid` returns `400 {"error": "invalid ring_group_uuid"}`.
 
 ## `ringgroup-details`
 | Parameter         | Required | Description |
