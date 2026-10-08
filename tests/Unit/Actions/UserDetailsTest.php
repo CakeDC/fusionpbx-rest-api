@@ -5,9 +5,8 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * user-details (#43971): ZuluCall's getUser, used by the identity mapping
- * (#43389) to check that a stored domain_uuid + user_uuid pair still resolves
- * to a FusionPBX user.
+ * user-details: getUser used by the identity mapping to check that
+ * a stored domain_uuid + user_uuid pair still resolves to a FusionPBX user.
  */
 #[RunTestsInSeparateProcesses]
 class UserDetailsTest extends ActionTestCase
@@ -70,9 +69,17 @@ class UserDetailsTest extends ActionTestCase
 		}
 	}
 
+	// FusionPBX stores uuids in lower case and is_uuid() accepts both, so the
+	// uuid is lower-cased like domain_uuid: text columns (sqlite, mysql) would
+	// otherwise miss an existing user
+	public function testFindsTheUserByAnUpperCaseUuid(): void
+	{
+		$this->assertSame(self::AGENT, $this->details(strtoupper(self::AGENT))['user_uuid']);
+	}
+
 	public function testRejectsAMalformedUserUuid(): void
 	{
-		foreach (array('agent', array(self::AGENT), 42) as $user_uuid) {
+		foreach (array('agent', '', array(self::AGENT), 42) as $user_uuid) {
 			$this->assertSame(array('error' => 'invalid user_uuid', 'code' => 400), $this->details($user_uuid), json_encode($user_uuid));
 		}
 	}

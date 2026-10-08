@@ -25,6 +25,12 @@ class ActionDeclarationsTest extends TestCase
 		'domain-details' => array(),
 		'domain-list' => array('domain_view'),
 		'extension-create' => array('extension_add', 'voicemail_add'),
+		'extension-delete' => array(
+			'extension_delete', 'extension_user_delete', 'follow_me_delete', 'follow_me_destination_delete',
+			'ring_group_destination_delete', 'extension_setting_delete', 'voicemail_delete',
+			'voicemail_option_delete', 'voicemail_message_delete', 'voicemail_destination_delete',
+			'voicemail_greeting_delete',
+		),
 		'extension-details' => array('extension_view'),
 		'extension-list' => array('extension_view'),
 		'extension-update' => array('extension_edit'),

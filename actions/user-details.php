@@ -2,13 +2,15 @@
 $required_params = array("user_uuid");
 $required_permissions = array("user_view");
 
-// ZuluCall's getUser (#43971): lets the identity mapping (#43389) check that
 // a stored domain_uuid + user_uuid pair still resolves to a FusionPBX user.
 // a disabled user is returned too, with user_enabled false
 function do_action($body) {
     if(!is_uuid($body->user_uuid)) {
         return array("error" => "invalid user_uuid", "code" => 400);
     }
+    // FusionPBX stores uuids in lower case; low    er-cased like domain_uuid so
+    // text columns (sqlite, mysql) match an upper-case uuid too
+    $body->user_uuid = strtolower($body->user_uuid);
 
     $sql = "SELECT ".implode(", ", REST_API_USER_FIELDS)." FROM v_users WHERE user_uuid = :user_uuid AND domain_uuid = :domain_uuid";
     $parameters['user_uuid'] = $body->user_uuid;
