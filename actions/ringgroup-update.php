@@ -98,14 +98,17 @@ function do_action($body) {
 
     $removed = array();
     if($set_destinations) {
-        $sql = "SELECT ring_group_destination_uuid, destination_number FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
+        $sql = "SELECT ring_group_destination_uuid, destination_number, destination_enabled FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
         $current = $database->select($sql, array("ring_group_uuid" => $body->ring_group_uuid), 'all');
         if(!is_array($current)) {
             return array("error" => "database error", "code" => 500);
         }
         $kept = array();
         foreach($current as $destination) {
-            if(in_array((string)$destination["destination_number"], $numbers, true)) {
+            // a disabled row doesn't ring (FusionPBX skips it): it gives way to
+            // an enabled one when its number is given
+            $enabled = in_array($destination["destination_enabled"], array(true, 1, "1", "t", "true"), true);
+            if($enabled && in_array((string)$destination["destination_number"], $numbers, true)) {
                 $kept[] = (string)$destination["destination_number"];
             } else {
                 $removed[] = array("ring_group_destination_uuid" => $destination["ring_group_destination_uuid"]);

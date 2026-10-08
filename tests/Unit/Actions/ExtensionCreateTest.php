@@ -50,6 +50,7 @@ class ExtensionCreateTest extends ActionTestCase
 		$this->assertSame('tenant1.example.com', $result['user_context']);
 		$this->assertSame(array('Sales', '5551000'), array($result['outbound_caller_id_name'], $result['outbound_caller_id_number']));
 		$this->assertArrayNotHasKey('password', $result);
+		$this->assertTrue($result['enabled']);
 		$this->assertSame('101', $tables['v_voicemails'][0]['voicemail_id']);
 		$this->assertArrayNotHasKey('v_extension_users', $tables);
 		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');

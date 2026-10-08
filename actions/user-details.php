@@ -8,7 +8,7 @@ function do_action($body) {
     if(!is_uuid($body->user_uuid)) {
         return array("error" => "invalid user_uuid", "code" => 400);
     }
-    // FusionPBX stores uuids in lower case; low    er-cased like domain_uuid so
+    // FusionPBX stores uuids in lower case; lower-cased like domain_uuid so
     // text columns (sqlite, mysql) match an upper-case uuid too
     $body->user_uuid = strtolower($body->user_uuid);
 

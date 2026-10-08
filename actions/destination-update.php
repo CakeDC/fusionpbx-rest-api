@@ -77,7 +77,8 @@ function do_action($body) {
         }
         foreach($old_actions as $i => $old_action) {
             $line = rest_api_dialplan_action_xml($old_action["destination_app"] ?? "", $old_action["destination_data"] ?? "");
-            if(strpos($xml, $line) === false) {
+            // a line found twice could leave the call routed by the other one
+            if(substr_count($xml, $line) !== 1) {
                 return array("error" => "the destination's dialplan does not match its actions", "code" => 409);
             }
             if($i === 0) {
@@ -135,17 +136,8 @@ function do_action($body) {
     if(!$database->save($array)) {
         return array("error" => "error updating destination", "code" => 500);
     }
-    if($old_details) {
-        $delete = array();
-        foreach($old_details as $detail) {
-            $delete["dialplan_details"][] = array("dialplan_detail_uuid" => $detail["dialplan_detail_uuid"]);
-        }
-        if(!$database->delete($delete)) {
-            return array("error" => "error updating destination", "code" => 500);
-        }
-    }
-
-    // the cache keys destination_edit.php clears, by dialplan mode
+    // the cache keys destination_edit.php clears, by dialplan mode, as soon as
+    // the dialplan is saved, even if deleting the old details fails
     $context = $destination["destination_context"];
     $number = $destination["destination_number"];
     $prefix = $destination["destination_prefix"];
@@ -169,6 +161,16 @@ function do_action($body) {
     $cache = new cache;
     foreach(array_unique($keys) as $key) {
         $cache->delete($key);
+    }
+
+    if($old_details) {
+        $delete = array();
+        foreach($old_details as $detail) {
+            $delete["dialplan_details"][] = array("dialplan_detail_uuid" => $detail["dialplan_detail_uuid"]);
+        }
+        if(!$database->delete($delete)) {
+            return array("error" => "error updating destination", "code" => 500);
+        }
     }
 
     $sql = "SELECT domain_uuid, destination_number, destination_actions, destination_enabled FROM v_destinations WHERE destination_uuid = :destination_uuid";

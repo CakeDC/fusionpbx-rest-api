@@ -105,7 +105,7 @@ class ExtensionDeleteTest extends ActionTestCase
 
 	protected function tearDown(): void
 	{
-		exec('rm -rf '.escapeshellarg($this->voicemailDir));
+		exec('chmod -R u+w '.escapeshellarg($this->voicemailDir).' && rm -rf '.escapeshellarg($this->voicemailDir));
 	}
 
 	private function delete(string $extension_uuid = self::EXT_100): array
@@ -144,6 +144,28 @@ class ExtensionDeleteTest extends ActionTestCase
 		$this->assertSame(array('m2'), $this->ids('v_voicemail_messages', 'voicemail_message_uuid'));
 		$this->assertSame(array('vd3'), $this->ids('v_voicemail_destinations', 'voicemail_destination_uuid'));
 		$this->assertSame(array('g2'), $this->ids('v_voicemail_greetings', 'voicemail_greeting_uuid'));
+	}
+
+	// the rows are already gone, so the extension is deleted; a file left
+	// behind is logged rather than lost silently
+	public function testLogsVoicemailFilesItCantRemove(): void
+	{
+		$box = $this->voicemailDir.'/default/tenant1.example.com/100';
+		chmod($box, 0555);
+		$log = tempnam(sys_get_temp_dir(), 'rest_api_log');
+		$previous = ini_set('error_log', $log);
+		try {
+			$result = $this->delete();
+		} finally {
+			ini_set('error_log', $previous);
+		}
+		$logged = file_get_contents($log);
+		unlink($log);
+
+		$this->assertSame(array('code' => 204), $result);
+		$this->assertFileExists($box.'/msg_1.wav');
+		$this->assertStringContainsString('could not remove '.$box.'/msg_1.wav', $logged);
+		$this->assertStringContainsString('could not remove '.$box, $logged);
 	}
 
 	public function testDeletesTheVoicemailFilesOfTheDomainOnly(): void

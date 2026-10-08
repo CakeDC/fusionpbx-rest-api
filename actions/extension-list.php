@@ -58,7 +58,7 @@ function do_action($body) {
     $data = array();
     foreach($extensions as $extension) {
         $extension["user_uuid"] = $users[$extension["extension_uuid"]] ?? null;
-        $data[] = rest_api_format_user_extension($extension);
+        $data[] = rest_api_format_extension($extension);
     }
     return array("data" => $data, "pagination" => $pagination);
 }

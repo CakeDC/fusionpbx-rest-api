@@ -96,10 +96,15 @@ function do_action($body) {
                 continue;
             }
             $path = $voicemail_dir."/default/".$domain_name."/".$voicemail["voicemail_id"];
+            // the rows are gone already: a file that stays is logged, not fatal
             foreach(glob($path."/*.*") ?: array() as $file) {
-                @unlink($file);
+                if(!@unlink($file)) {
+                    error_log("rest_api: extension-delete could not remove ".$file);
+                }
             }
-            @rmdir($path);
+            if(is_dir($path) && !@rmdir($path)) {
+                error_log("rest_api: extension-delete could not remove ".$path);
+            }
         }
     }
 
