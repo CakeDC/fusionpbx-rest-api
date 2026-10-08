@@ -122,6 +122,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 ## Upgrading from earlier versions
 
 From 1.0.0:
+- `originate` calls `destination_a` first, as documented (it used to call `destination_b` first), and answers `201` with the call (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`) instead of `{"success": ..., "call_uuid": ...}`. A call FreeSWITCH can't place now answers `500` instead of `200` with `success: false`.
 - Run Advanced → Upgrade → Permission Defaults: it adds the plugin's `rest_api_call_control` permission (to the superadmin and admin groups), which the call control actions need.
 - `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
 - `ringgroup-create` answers `201` instead of `200`, with the ring group as `ringgroup-details` returns it (`ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy`, `destinations`) instead of FusionPBX's columns and `ring_group_destinations`. An existing extension answers `409` instead of `500`. `destinations` may now be a JSON array; invalid destinations answer `400 {"error": "invalid destinations"}` instead of the previous messages.
@@ -383,7 +384,11 @@ A missing permission returns `403` with `missing_permissions`, a ring group that
 | `destination_a`    | yes      | the number to call first  |
 | `destination_b`    | yes      | the number to call second |
 
-Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. The selected domain's internal dialplan is used, so internal extensions may be dialed.
+Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. The selected domain's internal dialplan is used, so internal extensions may be dialed. Numbers are digits, `*`, `#` and an optional leading `+`.
+
+Answers `201` with the call as `call-list` returns it (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`), once destination_a has answered. `call_uuid` is the leg that rings destination_a and bridges destination_b; it carries the domain, so `call-hangup`, `call-hold`, `call-resume` and `call-transfer` accept it.
+
+When FreeSWITCH can't place the call it returns `500` with its reason, e.g. `{"error": "call failed: NO_ANSWER"}`, and `500 {"error": "event socket error"}` when the event socket can't be reached. An invalid number returns `400 {"error": "invalid <parameter>"}`.
 
 Note that the call is ended when destination_a ends the call, so if one leg isn't expected to hang up, make it destination_b.
 
