@@ -19,6 +19,7 @@ abstract class RestApiTestCase extends HttpTestCase
 		'ring_group_add', 'ring_group_destination_add', 'extension_view', 'destination_view',
 		'xml_cdr_view', 'click_to_call_call', 'user_view', 'domain_view', 'extension_edit',
 		'destination_edit', 'dialplan_edit', 'dialplan_detail_delete', 'destination_delete', 'dialplan_delete',
+		'ring_group_view', 'ring_group_destination_view', 'ring_group_edit', 'ring_group_destination_delete',
 	);
 
 	protected function tables(): array
