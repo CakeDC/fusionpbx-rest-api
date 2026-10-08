@@ -62,6 +62,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `call-hangup` | `call_active_hangup` |
 | `call-hold` | `rest_api_call_control` |
 | `call-list` | `call_active_view` |
+| `call-resume` | `rest_api_call_control` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
@@ -423,6 +424,14 @@ List the active calls of a domain from FreeSWITCH (`show channels`), one item pe
 `state` comes from the channel's call state: `ringing` (`DOWN`, `DIALING`, `RINGING`, `EARLY`, `RING_WAIT`, or any state FreeSWITCH adds later), `answered` (`ACTIVE`, `UNHELD`), `held` (`HELD`), `ended` (`HANGUP`), and `bridged` for an answered channel that `show calls` pairs with another leg.
 
 An invalid `extension` returns `400 {"error": "invalid extension"}`. When the event socket can't be reached or FreeSWITCH doesn't answer with JSON, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-resume`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The held call's channel uuid, as `call-list` returns it |
+
+Take a held call off hold (`uuid_hold off`) and return it as `call-list` does, with `state` `answered` or `bridged`. Resuming a call that isn't held changes nothing. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `callcenter-agent-list`
 | Parameter     | Required | Description |
