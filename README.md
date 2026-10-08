@@ -59,6 +59,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | Action | Permissions |
 |---|---|
 | `call-answer` | `rest_api_call_control` |
+| `call-hangup` | `call_active_hangup` |
 | `call-list` | `call_active_view` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
@@ -393,6 +394,14 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain (its `domain_uuid` variable) is checked first: a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding and resuming a call use it too.
+
+## `call-hangup`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The call's channel uuid, as `call-list` returns it |
+
+Hang up a call (`uuid_kill`, as FusionPBX's active calls page does). Answers `204` with no body. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `call-list`
 | Parameter     | Required | Description |
