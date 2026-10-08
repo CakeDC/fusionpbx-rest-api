@@ -262,6 +262,7 @@ function rest_api_destination_transfer_data($database, $domain_uuid, $type, $tar
         "ring_group" => "SELECT ring_group_extension, ring_group_context FROM v_ring_groups WHERE domain_uuid = :domain_uuid AND ring_group_uuid = :target",
         "ivr" => "SELECT ivr_menu_extension, ivr_menu_context FROM v_ivr_menus WHERE domain_uuid = :domain_uuid AND ivr_menu_uuid = :target",
         "voicemail" => "SELECT voicemail_id FROM v_voicemails WHERE domain_uuid = :domain_uuid AND voicemail_id = :target",
+        "queue" => "SELECT queue_extension, queue_context FROM v_call_center_queues WHERE domain_uuid = :domain_uuid AND call_center_queue_uuid = :target",
     );
     $parameters = array("domain_uuid" => $domain_uuid, "target" => $target);
     if($type === "extension") {
@@ -283,6 +284,8 @@ function rest_api_destination_transfer_data($database, $domain_uuid, $type, $tar
             return $record["ring_group_extension"]." XML ".($record["ring_group_context"] ?: $domain_name);
         case "ivr":
             return $record["ivr_menu_extension"]." XML ".($record["ivr_menu_context"] ?: $domain_name);
+        case "queue":
+            return $record["queue_extension"]." XML ".($record["queue_context"] ?: $domain_name);
         default:
             return "*99".$record["voicemail_id"]." XML ".$domain_name;
     }

@@ -19,6 +19,7 @@ class ActionDeclarationsTest extends TestCase
 		'call-hold' => array('rest_api_call_control'),
 		'call-list' => array('call_active_view'),
 		'call-resume' => array('rest_api_call_control'),
+		'call-transfer' => array('call_active_transfer'),
 		'callcenter-agent-list' => array('call_center_agent_view', 'call_center_tier_view'),
 		'callcenter-agent-state' => array('call_center_agent_view', 'call_center_agent_edit'),
 		'callcenter-agent-status' => array('call_center_agent_view'),
