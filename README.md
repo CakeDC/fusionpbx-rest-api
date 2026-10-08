@@ -80,6 +80,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-update` | `extension_edit`, plus per field: `caller_id_name` needs `effective_caller_id_name`, `outbound_caller_id_name`, `emergency_caller_id_name`; `caller_id_number` the same three `*_number` permissions; `enabled` needs `extension_enabled`; `user_uuid` needs `extension_user_add` (`extension_user_delete` for `null`) |
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
+| `recording-details` | `call_recording_view` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
 | `ringgroup-delete` | `ring_group_delete`, `ring_group_user_delete`, `ring_group_destination_delete`, `dialplan_delete`, `dialplan_detail_delete` |
 | `ringgroup-details` | `ring_group_view`, `ring_group_destination_view` |
@@ -293,6 +294,14 @@ Return one FusionPBX user, to check that a stored `domain_uuid` + `user_uuid` pa
 
 List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
+## `recording-details`
+| Parameter      | Required | Description |
+|----------------|----------|-------------|
+| `domain_uuid`  | no  | Domain to act on. Defaults to the key user's domain |
+| `recording_id` | yes | The recorded call leg's `xml_cdr_uuid` |
+
+Return a call recording's metadata: `recording_id`, `domain_uuid`, `filename` (the leg's `record_name`), `duration` (seconds), `xml_cdr_uuid` and `created` (the leg's `start_stamp`). As in FusionPBX's Call Recordings app, a recording is a call leg with a recording file, other than the ring group legs that lost the race (`LOSE_RACE`), and its id is the leg's `xml_cdr_uuid`. A leg that doesn't exist, belongs to another domain or wasn't recorded returns `404 {"error": "recording not found"}`, and a malformed id returns `400 {"error": "invalid recording_id"}`.
+
 ## `ringgroup-create`
 | Parameter      | Required | Description |
 |----------------|----------|-------------|
@@ -488,7 +497,7 @@ composer test
 * `tests/Unit`: the `lib/` helpers and every action, each test in its own PHP process.
 * `tests/Http`: `rest.php` and the key management pages, served by PHP's built-in web server from a temporary FusionPBX-like document root.
 
-The in-memory database only shows that the plugin's SQL does what it should, not that PostgreSQL accepts it. The `pgsql` suite (`tests/Pgsql`) runs the `cdr-search` and `cdr-details` tests, and the App Defaults index, on a real PostgreSQL with FusionPBX 5.6.5's `v_xml_cdr` columns, through PDO the way FusionPBX's `database` class uses it. It needs Docker:
+The in-memory database only shows that the plugin's SQL does what it should, not that PostgreSQL accepts it. The `pgsql` suite (`tests/Pgsql`) runs the `cdr-search`, `cdr-details` and `recording-details` tests, and the App Defaults index, on a real PostgreSQL with FusionPBX 5.6.5's `v_xml_cdr` columns, through PDO the way FusionPBX's `database` class uses it. It needs Docker:
 
 ```
 composer test-pgsql                         # PostgreSQL 18 (the FusionPBX installer's default), PHP 8.3
