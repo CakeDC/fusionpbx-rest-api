@@ -58,6 +58,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 
 | Action | Permissions |
 |---|---|
+| `call-list` | `call_active_view` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
@@ -380,6 +381,18 @@ Call one number (destination_a) and connect the call to another number (destinat
 Note that the call is ended when destination_a ends the call, so if one leg isn't expected to hang up, make it destination_b.
 
 Use `destination_b=*9664` to indefinitely play hold music to destination_a.
+
+## `call-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `extension`   | no | Only the calls of this extension: it called, was called, or is the channel's presence (e.g. a ring group ringing it) |
+
+List the active calls of a domain from FreeSWITCH (`show channels`), one item per channel: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id.
+
+`state` comes from the channel's call state: `ringing` (`DOWN`, `DIALING`, `RINGING`, `EARLY`, `RING_WAIT`, or any state FreeSWITCH adds later), `answered` (`ACTIVE`, `UNHELD`), `held` (`HELD`), `ended` (`HANGUP`), and `bridged` for an answered channel that `show calls` pairs with another leg.
+
+An invalid `extension` returns `400 {"error": "invalid extension"}`. When the event socket can't be reached or FreeSWITCH doesn't answer with JSON, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `callcenter-agent-list`
 | Parameter     | Required | Description |

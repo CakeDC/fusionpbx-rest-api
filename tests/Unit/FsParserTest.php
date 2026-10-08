@@ -96,4 +96,26 @@ class FsParserTest extends TestCase
 
 		$this->assertSame(array('error' => 'Failed to connect to event socket'), fs_api_value('api callcenter_config agent get status x'));
 	}
+
+	// "show channels as json" and the like
+	public function testDecodesAJsonReply(): void
+	{
+		$this->respondWith("{\"row_count\":1,\"rows\":[{\"uuid\":\"a1\"}]}\n");
+
+		$this->assertSame(array('row_count' => 1, 'rows' => array(array('uuid' => 'a1'))), fs_api_json('api show channels as json'));
+	}
+
+	public function testReportsAReplyThatIsNotJson(): void
+	{
+		$this->respondWith("+OK\n");
+
+		$this->assertSame(array('error' => 'freeswitch reply is not JSON', 'details' => '+OK'), fs_api_json('api show channels as json'));
+	}
+
+	public function testReportsARejectedJsonCommand(): void
+	{
+		$this->respondWith("-ERR no reply\n");
+
+		$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => '-ERR no reply'), fs_api_json('api show channels as json'));
+	}
 }

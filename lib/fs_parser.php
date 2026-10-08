@@ -44,3 +44,17 @@ function fs_api_value($command) {
   }
   return $response;
 }
+
+// the decoded reply of a command answering JSON ("show channels as json"),
+// or an error array like fs_api_value()'s
+function fs_api_json($command) {
+  $reply = fs_api_value($command);
+  if (is_array($reply)) {
+    return $reply;
+  }
+  $json = json_decode($reply, true);
+  if (!is_array($json)) {
+    return array("error" => "freeswitch reply is not JSON", "details" => $reply);
+  }
+  return $json;
+}
