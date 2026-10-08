@@ -81,6 +81,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
 | `recording-details` | `call_recording_view` |
+| `recording-download` | `call_recording_download` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
 | `ringgroup-delete` | `ring_group_delete`, `ring_group_user_delete`, `ring_group_destination_delete`, `dialplan_delete`, `dialplan_detail_delete` |
 | `ringgroup-details` | `ring_group_view`, `ring_group_destination_view` |
@@ -301,6 +302,16 @@ List the FusionPBX users of a domain, disabled ones included, sorted by username
 | `recording_id` | yes | The recorded call leg's `xml_cdr_uuid` |
 
 Return a call recording's metadata: `recording_id`, `domain_uuid`, `filename` (the leg's `record_name`), `duration` (seconds), `xml_cdr_uuid` and `created` (the leg's `start_stamp`). As in FusionPBX's Call Recordings app, a recording is a call leg with a recording file, other than the ring group legs that lost the race (`LOSE_RACE`), and its id is the leg's `xml_cdr_uuid`. A leg that doesn't exist, belongs to another domain or wasn't recorded returns `404 {"error": "recording not found"}`, and a malformed id returns `400 {"error": "invalid recording_id"}`.
+
+## `recording-download`
+| Parameter      | Required | Description |
+|----------------|----------|-------------|
+| `domain_uuid`  | no  | Domain to act on. Defaults to the key user's domain |
+| `recording_id` | yes | The recorded call leg's `xml_cdr_uuid`, as in `recording-details` |
+
+Download a call recording. Unlike every other action, the response is the audio file itself, not JSON: `200` with `Content-Type` `audio/wav`, `audio/mpeg` (mp3) or `application/octet-stream`, `Content-Length`, and `Content-Disposition: attachment; filename="..."`. The file is streamed, so its size isn't limited by PHP's memory.
+
+The file is read at the leg's `record_path`/`record_name`, as FusionPBX's Call Recordings app does, and only if it is inside FusionPBX's recordings directory (the `switch` → `recordings` default setting, `/var/lib/freeswitch/recordings` when unset); a path outside it, links included, is logged and answers `404`. Errors are JSON as for every action: `404 {"error": "recording not found"}` when the leg doesn't exist, belongs to another domain, wasn't recorded or its file is missing, `400` for a malformed id, and `500` when the file can't be read. Recordings that FusionPBX stores in the database (`call_recordings` → `storage_type` `base64`) aren't supported.
 
 ## `ringgroup-create`
 | Parameter      | Required | Description |
