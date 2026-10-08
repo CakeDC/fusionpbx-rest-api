@@ -50,3 +50,19 @@ function rest_api_format_call($dump, $domain_uuid) {
         "destination_number" => $destination !== "" ? $destination : null,
     );
 }
+
+// a leg read again after a call action, for the response: as a Call, with
+// state "ended" when it is already gone, or the 500 when the event socket
+// fails. the domain was checked before the action, so it isn't checked here
+function rest_api_call_after($call_uuid, $domain_uuid) {
+    $dump = fs_api_json("api uuid_dump ".$call_uuid." json");
+    if(isset($dump["error"])) {
+        if(strpos($dump["details"] ?? "", "-ERR No such channel") === 0) {
+            return array("call_uuid" => $call_uuid, "domain_uuid" => $domain_uuid, "state" => "ended", "caller_id_number" => null, "destination_number" => null);
+        }
+        error_log("rest_api: reading ".$call_uuid." after a call action failed: ".json_encode($dump));
+        return array("error" => "event socket error", "code" => 500);
+    }
+    $dump["Unique-ID"] = $call_uuid;
+    return rest_api_format_call($dump, $domain_uuid);
+}

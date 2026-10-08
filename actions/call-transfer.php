@@ -45,14 +45,5 @@ function do_action($body) {
     }
 
     // the transferred leg, which may already be gone
-    $dump = fs_api_json("api uuid_dump ".$transferred." json");
-    if(isset($dump["error"])) {
-        if(strpos($dump["details"] ?? "", "-ERR No such channel") === 0) {
-            return array("call_uuid" => $transferred, "domain_uuid" => $body->domain_uuid, "state" => "ended", "caller_id_number" => null, "destination_number" => null);
-        }
-        error_log("rest_api: reading ".$transferred." after its transfer failed: ".json_encode($dump));
-        return array("error" => "event socket error", "code" => 500);
-    }
-    $dump["Unique-ID"] = $transferred;
-    return rest_api_format_call($dump, $body->domain_uuid);
+    return rest_api_call_after($transferred, $body->domain_uuid);
 }

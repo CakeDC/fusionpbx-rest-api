@@ -64,6 +64,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `call-list` | `call_active_view` |
 | `call-resume` | `rest_api_call_control` |
 | `call-transfer` | `call_active_transfer` |
+| `call-transfer-attended` | `call_active_transfer` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
@@ -445,6 +446,24 @@ Take a held call off hold (`uuid_hold off`) and return it as `call-list` does, w
 Blind-transfer a call to an extension, ring group or call center queue of the domain (`uuid_transfer <call> [-bleg] <number> XML <context>`, the number and context of the target as FusionPBX routes to it). When the call is bridged, the other party is transferred (`-bleg`, as FusionPBX's active calls page parks a call) and the agent's leg is left to end; otherwise the channel itself is transferred.
 
 Returns the transferred leg as `call-list` does, read again after the transfer, or with `state` `ended` and no numbers if it is already gone. The call's domain is checked first, as in `call-answer`. A call of another domain or one that doesn't exist returns `404 {"error": "call not found"}`, a target that isn't in the domain `404 {"error": "target not found"}`, and an unknown `target_type` or invalid target (numbers: digits, `*`, `#`, optional leading `+`; ring groups and queues: uuids) `400`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-transfer-attended`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The agent's call, bridged to the caller, as `call-list` returns it |
+| `stage`       | yes | `consult`, `cancel` or `complete` |
+| `target`      | with `consult` | Number to consult (digits, `*`, `#`, optional leading `+`), dialed through the domain's dialplan |
+
+Warm (attended) transfer with FreeSWITCH's `att_xfer`, run on the agent's leg:
+
+* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time (`400 {"error": "consultation already in progress"}`). Returns the agent's call.
+* `cancel`: the consultation is hung up and the agent is back with the caller. Returns the agent's call.
+* `complete`: the agent's leg is hung up and the caller is bridged to the consulted party. Returns the caller's leg (`state` `ended` if it is already gone).
+
+The consultation is tracked on the agent's channel itself (the channel variables `rest_api_consult_uuid` and `rest_api_consult_caller`), so nothing is kept between requests; `cancel` or `complete` without a consultation in progress returns `400 {"error": "no consultation in progress"}`. The call's domain is checked first, as in `call-answer`, and the usual `400`, `404` and `500` apply.
+
+**Not yet verified on a real call.** The commands follow FreeSWITCH's documentation of `att_xfer` (`uuid_broadcast <agent> att_xfer::{origination_uuid=<uuid>}loopback/<target>/<domain> aleg`, then `uuid_kill` of the consult leg or of the agent's leg); try a warm transfer on a FusionPBX 5.6.5 test system before relying on it.
 
 ## `callcenter-agent-list`
 | Parameter     | Required | Description |
