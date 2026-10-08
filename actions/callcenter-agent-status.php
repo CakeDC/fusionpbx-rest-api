@@ -24,17 +24,10 @@ function do_action($body) {
     }
 
     $database = new database;
-    // FusionPBX's select() returns false on a database error
-    $sql = "SELECT call_center_agent_uuid FROM v_call_center_agents WHERE user_uuid = :user_uuid AND domain_uuid = :domain_uuid";
-    $sql .= " ORDER BY agent_name, call_center_agent_uuid";
-    $agents = $database->select($sql, array("user_uuid" => $user_uuid, "domain_uuid" => $body->domain_uuid), 'all');
-    if(!is_array($agents)) {
-        return array("error" => "database error", "code" => 500);
+    $agent_uuid = rest_api_call_center_agent($database, $body->domain_uuid, $user_uuid);
+    if(is_array($agent_uuid)) {
+        return $agent_uuid;
     }
-    if(!$agents || !is_uuid($agents[0]["call_center_agent_uuid"])) {
-        return array("error" => "agent not found", "code" => 404);
-    }
-    $agent_uuid = $agents[0]["call_center_agent_uuid"];
 
     if($set) {
         $commands = array("api callcenter_config agent set status ".$agent_uuid." '".$body->status."'");
@@ -43,10 +36,9 @@ function do_action($body) {
             $commands[] = "api callcenter_config agent set state ".$agent_uuid." 'Waiting'";
         }
         foreach($commands as $command) {
-            $reply = fs_api_value($command);
+            $reply = rest_api_call_center_command($command);
             if(is_array($reply)) {
-                error_log("rest_api: ".$command." failed: ".json_encode($reply));
-                return array("error" => "event socket error", "code" => 500);
+                return $reply;
             }
         }
 
@@ -60,14 +52,5 @@ function do_action($body) {
         }
     }
 
-    $live = array();
-    foreach(array("status", "state") as $field) {
-        $command = "api callcenter_config agent get ".$field." ".$agent_uuid;
-        $live[$field] = fs_api_value($command);
-        if(is_array($live[$field])) {
-            error_log("rest_api: ".$command." failed: ".json_encode($live[$field]));
-            return array("error" => "event socket error", "code" => 500);
-        }
-    }
-    return array("user_uuid" => $user_uuid, "status" => $live["status"], "state" => $live["state"]);
+    return rest_api_call_center_agent_live($agent_uuid, $user_uuid);
 }

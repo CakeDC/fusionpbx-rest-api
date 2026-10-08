@@ -24,6 +24,7 @@ abstract class ActionTestCase extends TestCase
 		require_once PLUGIN_DIR.'/lib/input_validation.php';
 		require_once PLUGIN_DIR.'/lib/fields.php';
 		require_once PLUGIN_DIR.'/lib/fs_parser.php';
+		require_once PLUGIN_DIR.'/lib/call_center.php';
 		$_SESSION = array();
 		FakeStore::reset($this->tables());
 		require PLUGIN_DIR.'/actions/'.$this->action().'.php';

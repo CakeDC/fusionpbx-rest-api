@@ -59,6 +59,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | Action | Permissions |
 |---|---|
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
+| `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
 | `callcenter-queue-list` | `call_center_queue_view` |
 | `callcenter-queue-status` | `call_center_active_view` |
@@ -366,6 +367,17 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 
 List the call center agents of a domain, sorted by agent name: `{"data": [...]}`, not paginated. Each item has `user_uuid` (the agent's FusionPBX user), `queues` (the queues the agent serves, `[{"call_center_queue_uuid", "level", "position"}]`, by tier level then position) and `wrap_up_time` (seconds, or `null` when not set). FusionPBX agents without a user are left out, as agents are identified by `user_uuid`. A domain without agents returns `{"data": []}`.
+
+## `callcenter-agent-state`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `user_uuid`   | yes | FusionPBX user whose call center agent to change |
+| `state`       | yes | `Waiting`, `In a queue call`, `Receiving a call` or `Wrap-up` |
+
+Set the call center state of a user's agent in FreeSWITCH's mod_callcenter (`callcenter_config agent set state`), for example `Waiting` to end its wrap-up so it takes queue calls again, and return `{"user_uuid", "status", "state"}` read live as `callcenter-agent-status` does. The state only lives in mod_callcenter; FusionPBX keeps no copy of it. A user with several agents in the domain is answered for the first by agent name.
+
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `callcenter-agent-status`
 | Parameter     | Required | Description |
