@@ -108,6 +108,17 @@ class InputValidationTest extends TestCase
 		}
 	}
 
+	// caller ID names end up in the directory and SIP headers: one line of text
+	public function testIsCallerIdNameAcceptsOneLineOfText(): void
+	{
+		foreach (array('Ana Ruiz', '', 'Recepción', str_repeat('a', 255)) as $value) {
+			$this->assertTrue(rest_api_is_caller_id_name($value), json_encode($value));
+		}
+		foreach (array(42, null, array('Ana'), "Ana\nRuiz", "Ana\x00", str_repeat('a', 256)) as $value) {
+			$this->assertFalse(rest_api_is_caller_id_name($value), json_encode($value));
+		}
+	}
+
 	// page and per_page of every paginated action (cdr-search, domain-list, user-list)
 	public function testParsePaginationDefaultsAndAcceptsDigitStrings(): void
 	{

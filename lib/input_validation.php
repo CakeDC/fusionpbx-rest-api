@@ -66,6 +66,12 @@ function rest_api_parse_int($value, $min, $max) {
     return $value;
 }
 
+// caller ID names end up in the directory and SIP headers: one line of text,
+// up to 255 bytes. "" is allowed and leaves or clears the name
+function rest_api_is_caller_id_name($value) {
+    return is_string($value) && strlen($value) <= 255 && !preg_match('/[\x00-\x1F\x7F]/', $value);
+}
+
 // page (1..1000000, default 1) and per_page (1..200, default 25) of a
 // paginated action, as array(page, per_page), or the 400 response. the page
 // cap keeps the offset from overflowing
