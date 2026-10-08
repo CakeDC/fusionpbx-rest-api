@@ -18,6 +18,7 @@ class ActionDeclarationsTest extends TestCase
 		'cdr-list' => array('xml_cdr_view'),
 		'cdr-search' => array('xml_cdr_view'),
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
+		'destination-delete' => array('destination_delete', 'dialplan_delete', 'dialplan_detail_delete'),
 		'destination-details' => array('destination_view'),
 		'destination-list' => array('destination_view'),
 		'destination-update' => array('destination_edit', 'dialplan_edit', 'dialplan_detail_add', 'dialplan_detail_delete'),
@@ -30,6 +31,9 @@ class ActionDeclarationsTest extends TestCase
 		'extension-user-list' => array('extension_view', 'user_view'),
 		'originate' => array('click_to_call_call'),
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
+		'ringgroup-details' => array('ring_group_view', 'ring_group_destination_view'),
+		'ringgroup-list' => array('ring_group_view', 'ring_group_destination_view'),
+		'ringgroup-update' => array('ring_group_edit'),
 		'user-details' => array('user_view'),
 		'user-list' => array('user_view'),
 	);
