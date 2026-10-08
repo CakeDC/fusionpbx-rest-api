@@ -362,6 +362,19 @@ function rest_api_format_user($user) {
     return $user;
 }
 
+// a v_call_center_queues row as the API returns it. FusionPBX names the
+// wait queue_tier_rule_wait_second, a numeric column (text from Postgres)
+function rest_api_format_call_center_queue($queue) {
+    $wait = $queue["queue_tier_rule_wait_second"];
+    return array(
+        "call_center_queue_uuid" => $queue["call_center_queue_uuid"],
+        "name" => $queue["queue_name"],
+        "extension" => $queue["queue_extension"],
+        "strategy" => $queue["queue_strategy"],
+        "queue_tier_rules_wait_second" => is_numeric($wait) ? (int)$wait : null,
+    );
+}
+
 // enabled is "true"/"false" text, or a boolean when the column is one
 function rest_api_format_user_extension($extension) {
     $extension['enabled'] = in_array($extension['enabled'], array(true, 1, "1", "t", "true"), true);

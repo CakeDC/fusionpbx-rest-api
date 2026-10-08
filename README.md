@@ -58,6 +58,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 
 | Action | Permissions |
 |---|---|
+| `callcenter-queue-list` | `call_center_queue_view` |
 | `cdr-details` | `xml_cdr_view` |
 | `cdr-list` | `xml_cdr_view` |
 | `cdr-search` | `xml_cdr_view` |
@@ -355,6 +356,13 @@ Call one number (destination_a) and connect the call to another number (destinat
 Note that the call is ended when destination_a ends the call, so if one leg isn't expected to hang up, make it destination_b.
 
 Use `destination_b=*9664` to indefinitely play hold music to destination_a.
+
+## `callcenter-queue-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+
+List the call center queues of a domain, sorted by extension: `{"data": [...]}`, not paginated. Each item has `call_center_queue_uuid`, `name`, `extension`, `strategy` (mod_callcenter's, e.g. `ring-all`) and `queue_tier_rules_wait_second` (FusionPBX's "tier rule wait second", an integer, or `null` when it isn't set). A domain without queues returns `{"data": []}`.
 
 ## `cdr-search`
 | Parameter        | Required | Description |
