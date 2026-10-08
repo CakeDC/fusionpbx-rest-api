@@ -21,7 +21,7 @@ function do_action($body) {
     if(is_array($agent_uuid)) {
         return $agent_uuid;
     }
-    $reply = rest_api_call_center_command("api callcenter_config agent set state ".$agent_uuid." '".$body->state."'");
+    $reply = rest_api_fs_command("api callcenter_config agent set state ".$agent_uuid." '".$body->state."'");
     if(is_array($reply)) {
         return $reply;
     }

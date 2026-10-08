@@ -58,6 +58,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 
 | Action | Permissions |
 |---|---|
+| `call-answer` | `rest_api_call_control` |
 | `call-list` | `call_active_view` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
@@ -116,6 +117,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 ## Upgrading from earlier versions
 
 From 1.0.0:
+- Run Advanced → Upgrade → Permission Defaults: it adds the plugin's `rest_api_call_control` permission (to the superadmin and admin groups), which the call control actions need.
 - `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
 - `ringgroup-create` answers `201` instead of `200`, with the ring group as `ringgroup-details` returns it (`ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy`, `destinations`) instead of FusionPBX's columns and `ring_group_destinations`. An existing extension answers `409` instead of `500`. `destinations` may now be a JSON array; invalid destinations answer `400 {"error": "invalid destinations"}` instead of the previous messages.
 - `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
@@ -381,6 +383,16 @@ Call one number (destination_a) and connect the call to another number (destinat
 Note that the call is ended when destination_a ends the call, so if one leg isn't expected to hang up, make it destination_b.
 
 Use `destination_b=*9664` to indefinitely play hold music to destination_a.
+
+## `call-answer`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The ringing call's channel uuid, as `call-list` returns it |
+
+Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain (its `domain_uuid` variable) is checked first: a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding and resuming a call use it too.
 
 ## `call-list`
 | Parameter     | Required | Description |

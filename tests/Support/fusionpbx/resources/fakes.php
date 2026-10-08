@@ -902,11 +902,18 @@ function event_socket_create($host = null, $port = null, $password = null) {
 	return FakeStore::read()['esl_available'] ? 'fake-socket' : false;
 }
 
-// the reply is esl_responses[<command>] when set, else esl_response
+// the reply is esl_responses[<command>] when set, else esl_response. a list
+// of replies is given in turn, the last one repeating
 function event_socket_request($fp, $cmd) {
 	return FakeStore::update(function (&$state) use ($cmd) {
 		$state['esl_commands'][] = $cmd;
-		return $state['esl_responses'][$cmd] ?? $state['esl_response'];
+		if (!isset($state['esl_responses'][$cmd])) {
+			return $state['esl_response'];
+		}
+		if (!is_array($state['esl_responses'][$cmd])) {
+			return $state['esl_responses'][$cmd];
+		}
+		return count($state['esl_responses'][$cmd]) > 1 ? array_shift($state['esl_responses'][$cmd]) : $state['esl_responses'][$cmd][0];
 	});
 }
 

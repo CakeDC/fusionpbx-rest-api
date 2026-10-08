@@ -18,21 +18,11 @@ function rest_api_call_center_agent($database, $domain_uuid, $user_uuid) {
     return $agents[0]["call_center_agent_uuid"];
 }
 
-// runs an event socket command; on failure logs why and gives the 500 to answer
-function rest_api_call_center_command($command) {
-    $reply = fs_api_value($command);
-    if(is_array($reply)) {
-        error_log("rest_api: ".$command." failed: ".json_encode($reply));
-        return array("error" => "event socket error", "code" => 500);
-    }
-    return $reply;
-}
-
 // the agent's live status and state, as the API returns them, or the 500
 function rest_api_call_center_agent_live($agent_uuid, $user_uuid) {
     $live = array("user_uuid" => $user_uuid);
     foreach(array("status", "state") as $field) {
-        $live[$field] = rest_api_call_center_command("api callcenter_config agent get ".$field." ".$agent_uuid);
+        $live[$field] = rest_api_fs_command("api callcenter_config agent get ".$field." ".$agent_uuid);
         if(is_array($live[$field])) {
             return $live[$field];
         }

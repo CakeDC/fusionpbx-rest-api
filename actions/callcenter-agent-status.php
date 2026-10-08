@@ -36,7 +36,7 @@ function do_action($body) {
             $commands[] = "api callcenter_config agent set state ".$agent_uuid." 'Waiting'";
         }
         foreach($commands as $command) {
-            $reply = rest_api_call_center_command($command);
+            $reply = rest_api_fs_command($command);
             if(is_array($reply)) {
                 return $reply;
             }

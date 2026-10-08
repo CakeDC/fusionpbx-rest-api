@@ -58,3 +58,14 @@ function fs_api_json($command) {
   }
   return $json;
 }
+
+// runs an event socket command for an action; on failure logs why and gives
+// the 500 the action answers
+function rest_api_fs_command($command) {
+  $reply = fs_api_value($command);
+  if (is_array($reply)) {
+    error_log("rest_api: ".$command." failed: ".json_encode($reply));
+    return array("error" => "event socket error", "code" => 500);
+  }
+  return $reply;
+}

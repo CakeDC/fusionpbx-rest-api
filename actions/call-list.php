@@ -41,10 +41,6 @@ function do_action($body) {
             $bridged[$call["b_uuid"]] = true;
         }
     }
-    $states = array(
-        "DOWN" => "ringing", "DIALING" => "ringing", "RINGING" => "ringing", "EARLY" => "ringing", "RING_WAIT" => "ringing",
-        "ACTIVE" => "answered", "UNHELD" => "answered", "HELD" => "held", "HANGUP" => "ended",
-    );
 
     $data = array();
     foreach($replies["channels"]["rows"] ?? array() as $channel) {
@@ -64,10 +60,7 @@ function do_action($body) {
             && $extension !== explode("@", $presence_id, 2)[0]) {
             continue;
         }
-        $state = $states[$channel["callstate"] ?? ""] ?? "ringing";
-        if($state === "answered" && isset($bridged[$channel["uuid"]])) {
-            $state = "bridged";
-        }
+        $state = rest_api_call_state($channel["callstate"] ?? "", isset($bridged[$channel["uuid"]]));
         $data[] = array(
             "call_uuid" => $channel["uuid"],
             "domain_uuid" => $body->domain_uuid,

@@ -24,7 +24,7 @@ class AppConfigTest extends TestCase
 
 	public function testKeyManagementPermissionsAreForSuperadmins(): void
 	{
-		$permissions = $this->app()['permissions'];
+		$permissions = array_slice($this->app()['permissions'], 0, 4);
 
 		$this->assertSame(
 			array('rest_api_key_view', 'rest_api_key_add', 'rest_api_key_edit', 'rest_api_key_delete'),
@@ -33,5 +33,14 @@ class AppConfigTest extends TestCase
 		foreach ($permissions as $permission) {
 			$this->assertSame(array('superadmin'), $permission['groups']);
 		}
+	}
+
+	// FusionPBX 5.6.5 has no permission to answer, hold or resume a call
+	public function testDeclaresTheCallControlPermissionForAdmins(): void
+	{
+		$permissions = array_column($this->app()['permissions'], null, 'name');
+
+		$this->assertSame(array('rest_api_key_view', 'rest_api_key_add', 'rest_api_key_edit', 'rest_api_key_delete', 'rest_api_call_control'), array_keys($permissions));
+		$this->assertSame(array('superadmin', 'admin'), $permissions['rest_api_call_control']['groups']);
 	}
 }

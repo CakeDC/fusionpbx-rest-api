@@ -99,3 +99,10 @@ $y++;
 $apps[$x]['permissions'][$y]['name'] = "rest_api_key_delete";
 $apps[$x]['permissions'][$y]['groups'][] = "superadmin";
 $y++;
+
+// FusionPBX has no permission to answer, hold or resume a call; the API's
+// call-answer, call-hold and call-resume need this one
+$apps[$x]['permissions'][$y]['name'] = "rest_api_call_control";
+$apps[$x]['permissions'][$y]['groups'][] = "superadmin";
+$apps[$x]['permissions'][$y]['groups'][] = "admin";
+$y++;
