@@ -66,6 +66,27 @@ function rest_api_parse_int($value, $min, $max) {
     return $value;
 }
 
+// caller ID names end up in the directory and SIP headers: one line of text,
+// up to 255 bytes. "" is allowed and leaves or clears the name
+function rest_api_is_caller_id_name($value) {
+    return is_string($value) && strlen($value) <= 255 && !preg_match('/[\x00-\x1F\x7F]/', $value);
+}
+
+// page (1..1000000, default 1) and per_page (1..200, default 25) of a
+// paginated action, as array(page, per_page), or the 400 response. the page
+// cap keeps the offset from overflowing
+function rest_api_parse_pagination($body) {
+    $page = isset($body->page) ? rest_api_parse_int($body->page, 1, 1000000) : 1;
+    if($page === false) {
+        return array("error" => "invalid page", "code" => 400);
+    }
+    $per_page = isset($body->per_page) ? rest_api_parse_int($body->per_page, 1, 200) : 25;
+    if($per_page === false) {
+        return array("error" => "invalid per_page", "code" => 400);
+    }
+    return array($page, $per_page);
+}
+
 // an ISO 8601 date (YYYY-MM-DD) or date-time. a date-time without an offset
 // is UTC. returns array(DateTimeImmutable in UTC, whether only a date was given),
 // or false

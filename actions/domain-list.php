@@ -6,14 +6,11 @@ $required_permissions = array("domain_view");
 // domain_select, the same rule rest.php applies to domain_uuid; others get
 // their own domain
 function do_action($body, $context = array()) {
-    $page = isset($body->page) ? rest_api_parse_int($body->page, 1, 1000000) : 1;
-    if($page === false) {
-        return array("error" => "invalid page", "code" => 400);
+    $pagination = rest_api_parse_pagination($body);
+    if(isset($pagination["error"])) {
+        return $pagination;
     }
-    $per_page = isset($body->per_page) ? rest_api_parse_int($body->per_page, 1, 200) : 25;
-    if($per_page === false) {
-        return array("error" => "invalid per_page", "code" => 400);
-    }
+    list($page, $per_page) = $pagination;
 
     $where = "";
     $parameters = array();
