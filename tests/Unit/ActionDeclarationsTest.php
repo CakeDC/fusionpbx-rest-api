@@ -33,6 +33,7 @@ class ActionDeclarationsTest extends TestCase
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
 		'ringgroup-details' => array('ring_group_view', 'ring_group_destination_view'),
 		'ringgroup-list' => array('ring_group_view', 'ring_group_destination_view'),
+		'ringgroup-update' => array('ring_group_edit'),
 		'user-details' => array('user_view'),
 		'user-list' => array('user_view'),
 	);

@@ -314,18 +314,20 @@ function rest_api_destination_transfer_data($database, $domain_uuid, $type, $tar
 // a destination action as FusionPBX's destination_edit.php writes it in the
 // dialplan XML (xml::sanitize(), keeping ${regex} and ${sofia_contact})
 function rest_api_dialplan_action_xml($app, $data) {
-    $sanitize = function($value) {
-        return htmlspecialchars(preg_replace('/\$\{[^}]+\}/', '', (string)$value), ENT_XML1);
-    };
     $allowed = array("regex", "sofia_contact");
     foreach($allowed as $command) {
         $data = str_replace('${'.$command, '#{'.$command, (string)$data);
     }
-    $data = $sanitize($data);
+    $data = rest_api_xml_sanitize($data);
     foreach($allowed as $command) {
         $data = str_replace('#{'.$command, '${'.$command, $data);
     }
-    return '<action application="'.$sanitize($app).'" data="'.$data.'"/>';
+    return '<action application="'.rest_api_xml_sanitize($app).'" data="'.$data.'"/>';
+}
+
+// FusionPBX's xml::sanitize(): drops ${...} variables and escapes the rest
+function rest_api_xml_sanitize($value) {
+    return htmlspecialchars(preg_replace('/\$\{[^}]+\}/', '', (string)$value), ENT_XML1);
 }
 
 // cdr-search and cdr-details: the Cdr of the ZuluCall contract (#43937)
