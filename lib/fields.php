@@ -108,9 +108,9 @@ const REST_API_RING_GROUP_DESTINATION_FIELDS = array(
 
 // From v_ring_groups rows (ring_group_uuid, domain_uuid, ring_group_name,
 // ring_group_extension, ring_group_strategy), with the destinations of all
-// of them read in one query. destinations are in FusionPBX's order, by delay
-// (a number, sorted here so text and numeric columns agree) then number.
-// false on a database error
+// of them read in one query. only enabled destinations, the ones FusionPBX
+// rings, in its order: by delay (a number, sorted here so text and numeric
+// columns agree) then number. false on a database error
 function rest_api_format_ring_groups($database, array $rows) {
     $destinations = array();
     if($rows) {
@@ -120,7 +120,7 @@ function rest_api_format_ring_groups($database, array $rows) {
             $placeholders[] = ":ring_group_uuid_".$i;
             $parameters["ring_group_uuid_".$i] = $row["ring_group_uuid"];
         }
-        $sql = "SELECT ring_group_uuid, destination_number, destination_delay FROM v_ring_group_destinations";
+        $sql = "SELECT ring_group_uuid, destination_number, destination_delay, destination_enabled FROM v_ring_group_destinations";
         $sql .= " WHERE ring_group_uuid IN (".implode(", ", $placeholders).")";
         $records = $database->select($sql, $parameters, 'all');
         if(!is_array($records)) {
@@ -131,6 +131,10 @@ function rest_api_format_ring_groups($database, array $rows) {
                 <=> array((float)$b["destination_delay"], (string)$b["destination_number"]);
         });
         foreach($records as $record) {
+            // FusionPBX's ring group script only rings enabled destinations
+            if(!in_array($record["destination_enabled"], array(true, 1, "1", "t", "true"), true)) {
+                continue;
+            }
             $destinations[$record["ring_group_uuid"]][] = array("number" => (string)$record["destination_number"]);
         }
     }
@@ -326,6 +330,12 @@ function rest_api_xml_sanitize($value) {
     return htmlspecialchars(preg_replace('/\$\{[^}]+\}/', '', (string)$value), ENT_XML1);
 }
 
+// a value the plugin writes into an XML attribute. unlike xml::sanitize() it
+// escapes quotes, so a value can't close the attribute and add others
+function rest_api_xml_attribute($value) {
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_XML1);
+}
+
 // cdr-search and cdr-details
 const REST_API_CDR_FIELDS = array(
     "xml_cdr_uuid",
@@ -375,8 +385,9 @@ function rest_api_format_user($user) {
     return $user;
 }
 
-// enabled is "true"/"false" text, or a boolean when the column is one
-function rest_api_format_user_extension($extension) {
+// every extension response: enabled is a boolean on Postgres but
+// "true"/"false" text on sqlite and mysql, and is always returned as a boolean
+function rest_api_format_extension($extension) {
     $extension['enabled'] = in_array($extension['enabled'], array(true, 1, "1", "t", "true"), true);
     return $extension;
 }

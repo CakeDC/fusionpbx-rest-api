@@ -80,7 +80,7 @@ function do_action($body) {
         $array["ring_groups"][] = array("ring_group_uuid" => $body->ring_group_uuid) + $row;
     }
 
-    // the name is also the dialplan's, in its XML as ring_group_edit.php writes it
+    // the name is also the dialplan's, in the XML ring_group_edit.php writes
     if(isset($body->name) && is_uuid($ring_group["dialplan_uuid"])) {
         $sql = "SELECT dialplan_xml FROM v_dialplans WHERE dialplan_uuid = :dialplan_uuid AND domain_uuid = :domain_uuid";
         $dialplans = $database->select($sql, array("dialplan_uuid" => $ring_group["dialplan_uuid"], "domain_uuid" => $body->domain_uuid), 'all');
@@ -88,7 +88,7 @@ function do_action($body) {
             return array("error" => "database error", "code" => 500);
         }
         if($dialplans) {
-            $name = rest_api_xml_sanitize($body->name);
+            $name = rest_api_xml_attribute($body->name);
             $xml = preg_replace_callback('/<extension name="[^"]*"/', function() use ($name) {
                 return '<extension name="'.$name.'"';
             }, (string)$dialplans[0]["dialplan_xml"], 1);
@@ -98,14 +98,17 @@ function do_action($body) {
 
     $removed = array();
     if($set_destinations) {
-        $sql = "SELECT ring_group_destination_uuid, destination_number FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
+        $sql = "SELECT ring_group_destination_uuid, destination_number, destination_enabled FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
         $current = $database->select($sql, array("ring_group_uuid" => $body->ring_group_uuid), 'all');
         if(!is_array($current)) {
             return array("error" => "database error", "code" => 500);
         }
         $kept = array();
         foreach($current as $destination) {
-            if(in_array((string)$destination["destination_number"], $numbers, true)) {
+            // a disabled row doesn't ring (FusionPBX skips it): it gives way to
+            // an enabled one when its number is given
+            $enabled = in_array($destination["destination_enabled"], array(true, 1, "1", "t", "true"), true);
+            if($enabled && in_array((string)$destination["destination_number"], $numbers, true)) {
                 $kept[] = (string)$destination["destination_number"];
             } else {
                 $removed[] = array("ring_group_destination_uuid" => $destination["ring_group_destination_uuid"]);

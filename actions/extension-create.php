@@ -137,7 +137,7 @@ function do_action($body) {
     if(!is_array($extensions) || !$extensions) {
         return array("error" => "database error", "code" => 500);
     }
-    $extension = $extensions[0];
+    $extension = rest_api_format_extension($extensions[0]);
     // the SIP password lets an integration provision the phone. FusionPBX only
     // shows it to users with extension_password, so the API does the same
     if(permission_exists('extension_password')) {

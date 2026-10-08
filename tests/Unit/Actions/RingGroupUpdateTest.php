@@ -103,6 +103,28 @@ class RingGroupUpdateTest extends ActionTestCase
 		$this->assertSame(self::dialplanXml('Sales &amp; Support'), $dialplan['dialplan_xml']);
 	}
 
+	// quotes too, or a name could close the attribute and add others
+	public function testEscapesQuotesInTheDialplanName(): void
+	{
+		$this->update(array('name' => 'x" continue="true'));
+
+		$this->assertSame(self::dialplanXml('x&quot; continue=&quot;true'), $this->row('v_dialplans', 'dialplan_uuid', self::DIALPLAN)['dialplan_xml']);
+	}
+
+	// an invalid fragment can break the dialplan of the whole context
+	public function testKeepsTheDialplanWellFormedWhateverTheName(): void
+	{
+		$name = 'Sales "VIP" & <Support> \'1\' x" continue="true"><action application="system" data="id"/><extension name="y';
+
+		$this->update(array('name' => $name));
+
+		$xml = simplexml_load_string($this->row('v_dialplans', 'dialplan_uuid', self::DIALPLAN)['dialplan_xml']);
+		$this->assertNotFalse($xml, 'the stored dialplan XML must parse');
+		$this->assertSame($name, (string)$xml['name']);
+		$this->assertSame('', (string)$xml['continue']);
+		$this->assertCount(3, $xml->condition->action);
+	}
+
 	public function testRenamesARingGroupWithoutADialplan(): void
 	{
 		\FakeStore::update(function (&$state) {
@@ -136,6 +158,23 @@ class RingGroupUpdateTest extends ActionTestCase
 		$this->assertSame(array('101' => array('0', '30')), $this->destinations(self::OTHER));
 		$added = $this->row('v_ring_group_destinations', 'destination_number', '103');
 		$this->assertSame(array(self::DOMAIN_UUID, 'true'), array($added['domain_uuid'], $added['destination_enabled']));
+	}
+
+	// every number given rings: a disabled row of that number, which FusionPBX
+	// doesn't ring, gives way to an enabled one
+	public function testANumberGivenRingsEvenIfItsRowWasDisabled(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_ring_group_destinations'][1]['destination_enabled'] = 'false';
+		});
+
+		$result = $this->update(array('destinations' => array(array('number' => '101'), array('number' => '102'))));
+
+		$this->assertSame(array(array('number' => '101'), array('number' => '102')), $result['destinations']);
+		$rows = array_filter($this->state()['tables']['v_ring_group_destinations'], function ($row) {
+			return $row['ring_group_uuid'] === self::SALES && $row['destination_number'] === '102';
+		});
+		$this->assertSame(array('true'), array_values(array_column($rows, 'destination_enabled')));
 	}
 
 	// JSON objects reach the action as objects

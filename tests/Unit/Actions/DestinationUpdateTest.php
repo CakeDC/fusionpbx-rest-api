@@ -268,4 +268,29 @@ class DestinationUpdateTest extends ActionTestCase
 		$this->assertCount(3, $this->state()['tables']['v_dialplan_details']);
 		$this->assertSame(array(), $this->state()['cache_deleted']);
 	}
+
+	// the dialplan is already changed: FusionPBX must stop serving the old one
+	public function testClearsTheCacheEvenWhenTheOldDetailsCantBeDeleted(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['delete_fails'] = true;
+			$state['settings']['destinations']['dialplan_mode'] = 'multiple';
+		});
+
+		$this->assertSame(array('error' => 'error updating destination', 'code' => 500), $this->update(array('destination_type' => 'ring_group', 'target' => self::RING_GROUP)));
+		$this->assertStringContainsString('600 XML tenant1.example.com', $this->row('v_dialplans', 'dialplan_uuid', self::DIALPLAN)['dialplan_xml']);
+		$this->assertSame(array('dialplan:public'), $this->state()['cache_deleted']);
+	}
+
+	// with the same line twice, replacing the first one could leave the call
+	// routed by the other
+	public function testAnswersConflictWhenAnActionLineAppearsTwice(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_dialplans'][0]['dialplan_xml'] = self::dialplanXml("\t\t".self::OLD_ACTION."\n\t\t".self::OLD_ACTION."\n");
+		});
+
+		$this->assertSame(array('error' => "the destination's dialplan does not match its actions", 'code' => 409), $this->update(array('destination_type' => 'ring_group', 'target' => self::RING_GROUP)));
+		$this->assertSame(array(), $this->state()['saved']);
+	}
 }

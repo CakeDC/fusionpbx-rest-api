@@ -20,9 +20,9 @@ class RingGroupDetailsTest extends ActionTestCase
 		return 'ringgroup-details';
 	}
 
-	private static function destination(string $uuid, string $ring_group, string $number, string $delay): array
+	private static function destination(string $uuid, string $ring_group, string $number, string $delay, string $enabled = 'true'): array
 	{
-		return array('ring_group_destination_uuid' => $uuid, 'ring_group_uuid' => $ring_group, 'destination_number' => $number, 'destination_delay' => $delay);
+		return array('ring_group_destination_uuid' => $uuid, 'ring_group_uuid' => $ring_group, 'destination_number' => $number, 'destination_delay' => $delay, 'destination_enabled' => $enabled);
 	}
 
 	protected function tables(): array
@@ -54,6 +54,18 @@ class RingGroupDetailsTest extends ActionTestCase
 			array('ring_group_uuid' => self::SALES, 'domain_uuid' => self::DOMAIN_UUID, 'name' => 'Sales', 'extension' => '600', 'strategy' => 'sequence', 'destinations' => array(array('number' => '101'), array('number' => '102'), array('number' => '103'))),
 			$this->details(self::SALES)
 		);
+	}
+
+	// FusionPBX's ring group script only rings enabled destinations, and the
+	// response has no flag to tell them apart
+	public function testLeavesDisabledDestinationsOut(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_ring_group_destinations'][1]['destination_enabled'] = 'false';
+			$state['tables']['v_ring_group_destinations'][2]['destination_enabled'] = false;
+		});
+
+		$this->assertSame(array(array('number' => '103')), $this->details(self::SALES)['destinations']);
 	}
 
 	public function testReturnsARingGroupWithoutDestinations(): void

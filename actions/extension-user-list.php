@@ -39,5 +39,5 @@ function do_action($body) {
         return array("error" => "database error", "code" => 500);
     }
 
-    return array("data" => array_map("rest_api_format_user_extension", $extensions));
+    return array("data" => array_map("rest_api_format_extension", $extensions));
 }

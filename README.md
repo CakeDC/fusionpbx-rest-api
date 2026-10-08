@@ -107,6 +107,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 ## Upgrading from earlier versions
 
 From 1.0.0:
+- `extension-create` and `extension-details` return `enabled` as a JSON boolean, like `extension-list`, whatever the database's column type (it was `"true"`/`"false"` text on sqlite and mysql).
 - `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
 - `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
 
@@ -197,7 +198,7 @@ looks up details of a domain. Mostly useful for converting between domain uuid a
 | `page`     | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page` | no | Rows per page, 1 to 200 (default 25) |
 
-List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 2}}`. Each item has `domain_uuid`, `domain_name` and `domain_enabled` (boolean). Users with `domain_select` get every domain, disabled ones included; other users only get their own domain. `domain_uuid` is ignored. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List domains, sorted by name: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 2}}`. Each item has `domain_uuid`, `domain_name` and `domain_enabled` (boolean). Users with `domain_select` get every domain, disabled ones included; other users only get their own domain. `domain_uuid` doesn't narrow the list, but it is still checked as for every action (see [Domains](#domains)). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `extension-create`
 
@@ -312,7 +313,7 @@ Return one ring group, enabled or not, as `ringgroup-list` returns it: `ring_gro
 | `page`        | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List the ring groups of a domain, disabled ones included, sorted by extension: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` (`[{"number": "101"}, ...]`, in the order FusionPBX shows them: by delay, then number). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List the ring groups of a domain, disabled ones included, sorted by extension: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy` and `destinations` (`[{"number": "101"}, ...]`, in the order FusionPBX shows them: by delay, then number; disabled destinations, which FusionPBX doesn't ring, are left out). A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `ringgroup-update`
 | Parameter         | Required | Description |
@@ -325,7 +326,7 @@ List the ring groups of a domain, disabled ones included, sorted by extension: `
 
 Update a ring group and return it as `ringgroup-details` does. Fields left out don't change; at least one is required (`400 {"error": "nothing to update"}` otherwise). The extension can't be changed. A new name is also written to the ring group's dialplan. The dialplan cache is cleared as FusionPBX's ring group page does.
 
-`destinations` sets which numbers ring. FusionPBX rings them by delay, then number, and the list carries only numbers, so numbers already in the ring group keep their delay, timeout and other settings, new ones get `ringgroup-create`'s defaults (no delay, 30 s timeout), and numbers left out are removed. The order of the list doesn't change the ringing order.
+`destinations` sets which numbers ring. FusionPBX rings them by delay, then number, and the list carries only numbers, so numbers already in the ring group keep their delay, timeout and other settings (a disabled one, which FusionPBX doesn't ring, is replaced by an enabled one), new ones get `ringgroup-create`'s defaults (no delay, 30 s timeout), and numbers left out are removed. The order of the list doesn't change the ringing order.
 
 A missing permission returns `403` with `missing_permissions`, a ring group that doesn't exist or belongs to another domain returns `404 {"error": "ring group not found"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
 

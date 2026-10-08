@@ -118,7 +118,8 @@ class ExtensionUpdateTest extends ActionTestCase
 		$result = $this->update(array('enabled' => 'false'));
 
 		$this->assertSame(REST_API_EXTENSION_FIELDS, array_keys($result));
-		$this->assertSame('false', $result['enabled']);
+		// a boolean, as extension-list returns it, whatever the column type
+		$this->assertFalse($result['enabled']);
 		$this->assertArrayNotHasKey('password', $result);
 	}
 
@@ -242,5 +243,53 @@ class ExtensionUpdateTest extends ActionTestCase
 
 		$this->assertSame(array('error' => 'error updating extension', 'code' => 500), $this->update(array('enabled' => false)));
 		$this->assertSame(array(), $this->state()['cache_deleted']);
+	}
+
+	// the extension is already changed: FusionPBX must stop serving the old entry
+	public function testClearsTheCacheEvenWhenTheUnlinkFails(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['delete_fails'] = true;
+		});
+
+		$this->assertSame(array('error' => 'error updating extension', 'code' => 500), $this->update(array('enabled' => false, 'user_uuid' => null)));
+		$this->assertSame('false', $this->extension()['enabled']);
+		$this->assertSame(array('directory:100@tenant1.example.com'), $this->state()['cache_deleted']);
+	}
+
+	public function testUpdatesSeveralFieldsAtOnce(): void
+	{
+		$this->update(array('caller_id_name' => 'Ana Ruiz', 'enabled' => false, 'user_uuid' => self::AGENT));
+
+		$extension = $this->extension();
+		$this->assertSame(array('Ana Ruiz', 'false'), array($extension['effective_caller_id_name'], $extension['enabled']));
+		$this->assertSame('old', $extension['effective_caller_id_number']);
+		$this->assertSame(array(self::COLLEAGUE, self::AGENT), $this->linkedUsers());
+	}
+
+	public function testEnablesADisabledExtension(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_extensions'][0]['enabled'] = 'false';
+		});
+
+		$this->update(array('enabled' => true));
+
+		$this->assertSame('true', $this->extension()['enabled']);
+	}
+
+	public function testRemovingTheLinksOfAnExtensionWithoutLinksIsHarmless(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_extension_users'] = array_values(array_filter($state['tables']['v_extension_users'], function ($row) {
+				return $row['extension_uuid'] !== self::EXT_100;
+			}));
+		});
+
+		$result = $this->update(array('user_uuid' => null));
+
+		$this->assertSame(self::EXT_100, $result['extension_uuid']);
+		$this->assertSame(array(), $this->linkedUsers());
+		$this->assertSame(array(self::OTHER_DOMAIN_USER), $this->linkedUsers(self::EXT_200));
 	}
 }

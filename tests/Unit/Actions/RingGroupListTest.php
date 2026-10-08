@@ -65,6 +65,16 @@ class RingGroupListTest extends ActionTestCase
 		), $this->list());
 	}
 
+	// FusionPBX's ring group script only rings enabled destinations
+	public function testLeavesDisabledDestinationsOut(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_ring_group_destinations'][0]['destination_enabled'] = 'false';
+		});
+
+		$this->assertSame(array(array('number' => '101'), array('number' => '102')), $this->list()['data'][0]['destinations']);
+	}
+
 	public function testOnlyListsRingGroupsOfTheRequestedDomain(): void
 	{
 		$data = $this->list(array(), self::OTHER_DOMAIN_UUID)['data'];

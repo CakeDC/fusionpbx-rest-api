@@ -113,6 +113,15 @@ function do_action($body) {
     if($array && !$database->save($array)) {
         return array("error" => "error updating extension", "code" => 500);
     }
+    // FusionPBX serves registrations from a cached directory entry. it is
+    // cleared the way extension_edit.php does, as soon as the extension is
+    // saved, so it is cleared even if removing the links fails
+    $cache = new cache;
+    $cache->delete("directory:".$extension["extension"]."@".$extension["user_context"]);
+    if(!empty($extension["number_alias"])) {
+        $cache->delete("directory:".$extension["number_alias"]."@".$extension["user_context"]);
+    }
+
     if($link_user && $body->user_uuid === null) {
         $unlink = array("extension_users" => array(array("extension_uuid" => $body->extension_uuid)));
         if(!$database->delete($unlink)) {
@@ -120,18 +129,10 @@ function do_action($body) {
         }
     }
 
-    // FusionPBX serves registrations from a cached directory entry, cleared
-    // the way extension_edit.php does
-    $cache = new cache;
-    $cache->delete("directory:".$extension["extension"]."@".$extension["user_context"]);
-    if(!empty($extension["number_alias"])) {
-        $cache->delete("directory:".$extension["number_alias"]."@".$extension["user_context"]);
-    }
-
     $sql = "SELECT ".implode(", ", REST_API_EXTENSION_FIELDS)." FROM v_extensions WHERE extension_uuid = :extension_uuid AND domain_uuid = :domain_uuid";
     $updated = $database->select($sql, $parameters, 'all');
     if(!is_array($updated) || !$updated) {
         return array("error" => "database error", "code" => 500);
     }
-    return $updated[0];
+    return rest_api_format_extension($updated[0]);
 }
