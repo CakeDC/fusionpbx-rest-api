@@ -60,6 +60,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 |---|---|
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-queue-list` | `call_center_queue_view` |
+| `callcenter-queue-status` | `call_center_active_view` |
 | `cdr-details` | `xml_cdr_view` |
 | `cdr-list` | `xml_cdr_view` |
 | `cdr-search` | `xml_cdr_view` |
@@ -371,6 +372,14 @@ List the call center agents of a domain, sorted by agent name: `{"data": [...]}`
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 
 List the call center queues of a domain, sorted by extension: `{"data": [...]}`, not paginated. Each item has `call_center_queue_uuid`, `name`, `extension`, `strategy` (mod_callcenter's, e.g. `ring-all`) and `queue_tier_rules_wait_second` (FusionPBX's "tier rule wait second", an integer, or `null` when it isn't set). A domain without queues returns `{"data": []}`.
+
+## `callcenter-queue-status`
+| Parameter                | Required | Description |
+|--------------------------|----------|-------------|
+| `domain_uuid`            | no  | Domain to act on. Defaults to the key user's domain |
+| `call_center_queue_uuid` | yes | Queue to look at |
+
+Live counts of a call center queue, read from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config queue list members|agents <extension>@<domain>`, as FusionPBX's Active Call Center page does): `call_center_queue_uuid`, `waiting_calls` (calls waiting for an agent), `member_count` (every call in the queue, waiting or with an agent) and `agent_count` (agents assigned to the queue, whatever their status). A queue that doesn't exist or belongs to another domain returns `404 {"error": "queue not found"}`, and a malformed uuid returns `400 {"error": "invalid call_center_queue_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `cdr-search`
 | Parameter        | Required | Description |

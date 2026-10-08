@@ -174,6 +174,18 @@ class FakesTest extends TestCase
 		$this->assertSame($links, FakeStore::read()['tables']['v_extension_users']);
 	}
 
+	// actions that send several commands need a reply per command
+	public function testEventSocketRepliesPerCommandWhenGiven(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['esl_responses']['api status'] = "UP 0 years\n";
+		});
+
+		$this->assertSame("UP 0 years\n", event_socket_request('fake-socket', 'api status'));
+		$this->assertSame(FakeStore::read()['esl_response'], event_socket_request('fake-socket', 'api other'));
+		$this->assertSame(array('api status', 'api other'), FakeStore::read()['esl_commands']);
+	}
+
 	// FusionPBX's settings: default settings by category and subcategory
 	public function testSettingsReturnTheStoredValueOrTheDefault(): void
 	{

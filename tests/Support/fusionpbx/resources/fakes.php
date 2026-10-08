@@ -902,10 +902,11 @@ function event_socket_create($host = null, $port = null, $password = null) {
 	return FakeStore::read()['esl_available'] ? 'fake-socket' : false;
 }
 
+// the reply is esl_responses[<command>] when set, else esl_response
 function event_socket_request($fp, $cmd) {
 	return FakeStore::update(function (&$state) use ($cmd) {
 		$state['esl_commands'][] = $cmd;
-		return $state['esl_response'];
+		return $state['esl_responses'][$cmd] ?? $state['esl_response'];
 	});
 }
 
