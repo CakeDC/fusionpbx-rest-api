@@ -87,25 +87,6 @@ const REST_API_DESTINATION_FIELDS = array(
     "update_date"
 );
 
-const REST_API_RING_GROUP_FIELDS = array(
-    "ring_group_uuid",
-    "domain_uuid",
-    "ring_group_name",
-    "ring_group_extension",
-    "ring_group_strategy",
-    "ring_group_enabled",
-    "ring_group_description",
-    "dialplan_uuid"
-);
-
-const REST_API_RING_GROUP_DESTINATION_FIELDS = array(
-    "ring_group_destination_uuid",
-    "destination_number",
-    "destination_delay",
-    "destination_timeout",
-    "destination_enabled"
-);
-
 // From v_ring_groups rows (ring_group_uuid, domain_uuid, ring_group_name,
 // ring_group_extension, ring_group_strategy), with the destinations of all
 // of them read in one query. destinations are in FusionPBX's order, by delay
@@ -324,6 +305,12 @@ function rest_api_dialplan_action_xml($app, $data) {
 // FusionPBX's xml::sanitize(): drops ${...} variables and escapes the rest
 function rest_api_xml_sanitize($value) {
     return htmlspecialchars(preg_replace('/\$\{[^}]+\}/', '', (string)$value), ENT_XML1);
+}
+
+// a value the plugin writes into an XML attribute. unlike xml::sanitize() it
+// escapes quotes, so a value can't close the attribute and add others
+function rest_api_xml_attribute($value) {
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_XML1);
 }
 
 // cdr-search and cdr-details

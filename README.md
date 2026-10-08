@@ -109,6 +109,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 From 1.0.0:
 - `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
+- `ringgroup-create` answers `201` instead of `200`, with the ring group as `ringgroup-details` returns it (`ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy`, `destinations`) instead of FusionPBX's columns and `ring_group_destinations`. An existing extension answers `409` instead of `500`. `destinations` may now be a JSON array; invalid destinations answer `400 {"error": "invalid destinations"}` instead of the previous messages.
 - `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
 
 Version 1.0.0 is the first release. Coming from the AccelerateNetworks code, or from a checkout older than 1.0.0, note that it changes how keys work:
@@ -290,13 +291,15 @@ List the FusionPBX users of a domain, disabled ones included, sorted by username
 ## `ringgroup-create`
 | Parameter      | Required | Description |
 |----------------|----------|-------------|
-| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
-| `name`         | yes      | name for the ring group |
-| `extension`    | yes      | Extension to route TO the ring group |
-| `destinations` | yes      | JSON array of extensions to send calls from the ring group. Example: `[{"number": "100"}, {"number": "101"}, {"number": "102"}]` |
-| `strategy`     | yes      | one of: `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
+| `domain_uuid`  | no  | Domain to act on. Defaults to the key user's domain |
+| `name`         | yes | Name of the ring group. One line, up to 255 characters |
+| `extension`    | yes | Extension that routes to the ring group: digits, `*`, `#`, optional leading `+` |
+| `destinations` | yes | JSON array of the numbers to ring, e.g. `[{"number": "100"}, {"number": "101"}]`. The same array encoded as a JSON string is still accepted |
+| `strategy`     | yes | `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
 
-Create a ring group
+Create a ring group with its destinations (no delay, 30 s timeout each) and its dialplan. Answers `201` with the ring group as `ringgroup-details` returns it. A number given twice rings once.
+
+An extension that already has a ring group in the domain returns `409 {"error": "ring group already exists"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
 
 ## `ringgroup-delete`
 | Parameter         | Required | Description |

@@ -80,7 +80,7 @@ function do_action($body) {
         $array["ring_groups"][] = array("ring_group_uuid" => $body->ring_group_uuid) + $row;
     }
 
-    // the name is also the dialplan's, in its XML as ring_group_edit.php writes it
+    // the name is also the dialplan's, in the XML ring_group_edit.php writes
     if(isset($body->name) && is_uuid($ring_group["dialplan_uuid"])) {
         $sql = "SELECT dialplan_xml FROM v_dialplans WHERE dialplan_uuid = :dialplan_uuid AND domain_uuid = :domain_uuid";
         $dialplans = $database->select($sql, array("dialplan_uuid" => $ring_group["dialplan_uuid"], "domain_uuid" => $body->domain_uuid), 'all');
@@ -88,7 +88,7 @@ function do_action($body) {
             return array("error" => "database error", "code" => 500);
         }
         if($dialplans) {
-            $name = rest_api_xml_sanitize($body->name);
+            $name = rest_api_xml_attribute($body->name);
             $xml = preg_replace_callback('/<extension name="[^"]*"/', function() use ($name) {
                 return '<extension name="'.$name.'"';
             }, (string)$dialplans[0]["dialplan_xml"], 1);

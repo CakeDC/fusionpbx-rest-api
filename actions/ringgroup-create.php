@@ -2,52 +2,66 @@
 $required_params = array("name", "extension", "destinations", "strategy");
 $required_permissions = array("ring_group_add", "ring_group_destination_add", "dialplan_add");
 
+// 201 with the ring group as ringgroup-details returns it, 409 when the
+// extension already has a ring group in the domain
 function do_action($body) {
-    if(!is_string($body->name)) {
+    if($body->name === "" || !rest_api_is_caller_id_name($body->name)) {
         return array("error" => "invalid name", "code" => 400);
     }
     if(!is_dial_number($body->extension)) {
         return array("error" => "invalid extension", "code" => 400);
     }
+    $body->extension = (string)$body->extension;
     if(!in_array($body->strategy, array("simultaneous", "sequence", "enterprise", "rollover", "random"), true)) {
         return array("error" => "invalid strategy", "code" => 400);
     }
-
-    $sql = "SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid";
-    $parameters['domain_uuid'] = $body->domain_uuid;
-    $database = new database;
-    $domain_name = $database->select($sql, $parameters, 'column');
-    unset($parameters);
-    if(!$domain_name) {
-        return array("error" => "domain not found");
+    // a JSON array, or the JSON-encoded string older clients send. numbers end
+    // up in the dial strings of FusionPBX's ring group script
+    $destinations = is_string($body->destinations) ? json_decode($body->destinations) : $body->destinations;
+    if(!is_array($destinations) || !$destinations) {
+        return array("error" => "invalid destinations", "code" => 400);
     }
+    $numbers = array();
+    foreach($destinations as $destination) {
+        $number = is_object($destination) ? ($destination->number ?? null) : (is_array($destination) ? ($destination["number"] ?? null) : null);
+        if(!is_dial_number($number)) {
+            return array("error" => "invalid destinations", "code" => 400);
+        }
+        $numbers[] = (string)$number;
+    }
+    $numbers = array_values(array_unique($numbers));
+
+    $database = new database;
+    // FusionPBX's select() returns false on a database error, which must not
+    // pass for a missing ring group and create a duplicate
+    $sql = "SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid";
+    $domains = $database->select($sql, array('domain_uuid' => $body->domain_uuid), 'all');
+    if(!is_array($domains)) {
+        return array("error" => "database error", "code" => 500);
+    }
+    if(!$domains) {
+        return array("error" => "domain not found", "code" => 404);
+    }
+    $domain_name = $domains[0]['domain_name'];
 
     $sql = "SELECT ring_group_uuid FROM v_ring_groups WHERE ring_group_extension = :extension AND domain_uuid = :domain_uuid";
-    $parameters['extension'] = $body->extension;
-    $parameters['domain_uuid'] = $body->domain_uuid;
-    $database = new database;
-    if($database->select($sql, $parameters, 'column')) {
-        return array("error" => "ring group already exists");
+    $existing = $database->select($sql, array('extension' => $body->extension, 'domain_uuid' => $body->domain_uuid), 'all');
+    if(!is_array($existing)) {
+        return array("error" => "database error", "code" => 500);
     }
-    unset($parameters);
+    if($existing) {
+        return array("error" => "ring group already exists", "code" => 409);
+    }
 
     $ring_group_uuid = uuid();
     $dialplan_uuid = uuid();
 
     $ring_group_destinations = array();
-    $requested_destinations = is_string($body->destinations) ? json_decode($body->destinations) : null;
-    if(!is_array($requested_destinations) || sizeof($requested_destinations) == 0) {
-        return array("error" => "no destinations specified. Value must be a JSON array", "code" => 400);
-    }
-
-    foreach($requested_destinations as $destination) {
-        if(!is_object($destination) || !is_dial_number($destination->number ?? null)) {
-            return array("error" => "invalid destination number", "code" => 400);
-        }
+    foreach($numbers as $number) {
         $ring_group_destinations[] = array(
             "ring_group_uuid" => $ring_group_uuid,
             "ring_group_destination_uuid" => uuid(),
-            "destination_number" => $destination->{'number'},
+            "destination_number" => $number,
             "destination_delay" => "0",
             "destination_timeout" => "30",
             "destination_prompt" => "",
@@ -84,7 +98,7 @@ function do_action($body) {
         "ring_group_destinations" => $ring_group_destinations
     );
 
-    $dialplan_xml = "<extension name=\"".htmlspecialchars($body->name, ENT_QUOTES | ENT_XML1)."\" continue=\"\" uuid=\"".$dialplan_uuid."\">\n";
+    $dialplan_xml = "<extension name=\"".rest_api_xml_attribute($body->name)."\" continue=\"\" uuid=\"".$dialplan_uuid."\">\n";
     $dialplan_xml .= "\t<condition field=\"destination_number\" expression=\"^".preg_quote((string)$body->extension)."$\">\n";
     $dialplan_xml .= "\t\t<action application=\"ring_ready\" data=\"\" />\n";
     $dialplan_xml .= "\t\t<action application=\"set\" data=\"ring_group_uuid=".$ring_group_uuid."\" />\n";
@@ -106,18 +120,18 @@ function do_action($body) {
         "app_uuid" => "1d61fb65-1eec-bc73-a6ee-a6203b4fe6f2" // ring group app
     );
 
-    $database = new database;
     $database->app_name = 'rest_api';
     $database->app_uuid = '2bfe71d9-e112-4b8b-bcff-75aeb0e06302';
     if(!$database->save($array)) {
-        return array("error" => "error adding ring group");
+        return array("error" => "error adding ring group", "code" => 500);
     }
 
-    $parameters['ring_group_uuid'] = $ring_group_uuid;
-    $database = new database;
-    $sql = "SELECT ".implode(", ", REST_API_RING_GROUP_FIELDS)." FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
-    $ring_group = $database->select($sql, $parameters, 'row');
-    $sql = "SELECT ".implode(", ", REST_API_RING_GROUP_DESTINATION_FIELDS)." FROM v_ring_group_destinations WHERE ring_group_uuid = :ring_group_uuid";
-    $ring_group['ring_group_destinations'] = $database->select($sql, $parameters, 'all');
-    return $ring_group;
+    $sql = "SELECT ring_group_uuid, domain_uuid, ring_group_name, ring_group_extension, ring_group_strategy FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
+    $rows = $database->select($sql, array("ring_group_uuid" => $ring_group_uuid), 'all');
+    $ring_groups = is_array($rows) && $rows ? rest_api_format_ring_groups($database, $rows) : false;
+    if(!$ring_groups) {
+        return array("error" => "database error", "code" => 500);
+    }
+    $ring_groups[0]["code"] = 201;
+    return $ring_groups[0];
 }

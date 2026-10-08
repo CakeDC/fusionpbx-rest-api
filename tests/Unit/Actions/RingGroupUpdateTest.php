@@ -103,6 +103,14 @@ class RingGroupUpdateTest extends ActionTestCase
 		$this->assertSame(self::dialplanXml('Sales &amp; Support'), $dialplan['dialplan_xml']);
 	}
 
+	// quotes too, or a name could close the attribute and add others
+	public function testEscapesQuotesInTheDialplanName(): void
+	{
+		$this->update(array('name' => 'x" continue="true'));
+
+		$this->assertSame(self::dialplanXml('x&quot; continue=&quot;true'), $this->row('v_dialplans', 'dialplan_uuid', self::DIALPLAN)['dialplan_xml']);
+	}
+
 	public function testRenamesARingGroupWithoutADialplan(): void
 	{
 		\FakeStore::update(function (&$state) {
