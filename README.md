@@ -59,6 +59,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | Action | Permissions |
 |---|---|
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
+| `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
 | `callcenter-queue-list` | `call_center_queue_view` |
 | `callcenter-queue-status` | `call_center_active_view` |
 | `cdr-details` | `xml_cdr_view` |
@@ -365,6 +366,19 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 
 List the call center agents of a domain, sorted by agent name: `{"data": [...]}`, not paginated. Each item has `user_uuid` (the agent's FusionPBX user), `queues` (the queues the agent serves, `[{"call_center_queue_uuid", "level", "position"}]`, by tier level then position) and `wrap_up_time` (seconds, or `null` when not set). FusionPBX agents without a user are left out, as agents are identified by `user_uuid`. A domain without agents returns `{"data": []}`.
+
+## `callcenter-agent-status`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `user_uuid`   | yes | FusionPBX user whose call center agent to read or change |
+| `status`      | no  | New status: `Available`, `Available (On Demand)`, `On Break` or `Logged Out`. Without it the status is only read |
+
+Read, or set, the call center status of a user's agent: `{"user_uuid", "status", "state"}`, both read live from FreeSWITCH's mod_callcenter through the event socket (`state` is `Waiting`, `In a queue call`, `Receiving a call`, `Wrap-up`...). A user with several agents in the domain is answered for the first by agent name.
+
+Setting runs the commands of FusionPBX's agent status page (`callcenter_config agent set status`, and `agent set state ... 'Waiting'` after `Available` or `Logged Out`) and saves the status on the agent, so FreeSWITCH keeps it after a restart. It doesn't change the user's own status (`user_status`) or the BLF lamps the page also updates.
+
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, an unknown status or malformed uuid returns `400`, and setting without `call_center_agent_edit` returns `403`. When the event socket can't be reached or FreeSWITCH refuses a command, it returns `500 {"error": "event socket error"}` and logs the reason; a refused status isn't saved.
 
 ## `callcenter-queue-list`
 | Parameter     | Required | Description |

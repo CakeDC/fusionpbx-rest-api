@@ -52,4 +52,48 @@ class FsParserTest extends TestCase
 		$this->assertSame(array('error' => 'Failed to connect to event socket'), parse_fs('api show channels'));
 		$this->assertSame(array(), FakeStore::read()['esl_commands']);
 	}
+
+	// commands like "callcenter_config agent get status" answer a bare value
+	public function testReadsASingleValue(): void
+	{
+		$this->respondWith("Available (On Demand)\n");
+
+		$this->assertSame('Available (On Demand)', fs_api_value('api callcenter_config agent get status x'));
+		$this->assertSame(array('api callcenter_config agent get status x'), FakeStore::read()['esl_commands']);
+	}
+
+	public function testReadsAnOkReply(): void
+	{
+		$this->respondWith("+OK\n");
+
+		$this->assertSame('+OK', fs_api_value('api callcenter_config agent set state x Waiting'));
+	}
+
+	public function testReportsARejectedSingleValue(): void
+	{
+		$this->respondWith("-ERR Invalid Agent!\n");
+
+		$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent!'), fs_api_value('api callcenter_config agent get status x'));
+	}
+
+	// 5.6.5's event_socket_request() returns false when it can't connect
+	public function testReportsAnEmptyOrFailedReply(): void
+	{
+		foreach (array('', false) as $response) {
+			FakeStore::update(function (&$state) use ($response) {
+				$state['esl_response'] = $response;
+			});
+
+			$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => ''), fs_api_value('api callcenter_config agent get status x'), json_encode($response));
+		}
+	}
+
+	public function testReportsAnUnavailableEventSocketForASingleValue(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['esl_available'] = false;
+		});
+
+		$this->assertSame(array('error' => 'Failed to connect to event socket'), fs_api_value('api callcenter_config agent get status x'));
+	}
 }
