@@ -60,6 +60,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 |---|---|
 | `call-answer` | `rest_api_call_control` |
 | `call-hangup` | `call_active_hangup` |
+| `call-hold` | `rest_api_call_control` |
 | `call-list` | `call_active_view` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
@@ -402,6 +403,14 @@ FusionPBX has no permission for answering a call, so the plugin adds `rest_api_c
 | `call_uuid`   | yes | The call's channel uuid, as `call-list` returns it |
 
 Hang up a call (`uuid_kill`, as FusionPBX's active calls page does). Answers `204` with no body. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-hold`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The call's channel uuid, as `call-list` returns it |
+
+Put an answered call on hold (`uuid_hold`, never toggled), so the other party hears the hold music, and return it as `call-list` does, with `state` `held`. Holding a call that is already held changes nothing. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses (e.g. the call isn't answered yet), it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `call-list`
 | Parameter     | Required | Description |
