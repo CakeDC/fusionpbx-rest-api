@@ -114,7 +114,7 @@ class RestAuthenticationTest extends RestApiTestCase
 	{
 		$response = $this->api(array('action' => 'extension-create', 'domain_uuid' => self::DOMAIN_UUID, 'extension' => '150'));
 
-		$this->assertSame(200, $response['status']);
+		$this->assertSame(201, $response['status']);
 		$this->assertSame(self::USER_UUID, $this->state()['tables']['v_extensions'][0]['insert_user']);
 	}
 

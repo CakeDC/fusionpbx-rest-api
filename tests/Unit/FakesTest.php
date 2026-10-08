@@ -160,6 +160,32 @@ class FakesTest extends TestCase
 		$this->assertSame(array('extension_users'), $state['skipped']);
 	}
 
+	// 5.6.5's delete() catches the PDOException and returns false
+	public function testDeleteReturnsFalseWhenTheDatabaseFails(): void
+	{
+		$links = array(array('extension_user_uuid' => 'l1', 'extension_uuid' => 'e1'));
+		FakeStore::update(function (&$state) use ($links) {
+			$state['tables']['v_extension_users'] = $links;
+			$state['delete_fails'] = true;
+		});
+		$_SESSION['permissions'] = array('extension_user_delete' => true);
+
+		$this->assertFalse((new \database)->delete(array('extension_users' => array(array('extension_uuid' => 'e1')))));
+		$this->assertSame($links, FakeStore::read()['tables']['v_extension_users']);
+	}
+
+	// FusionPBX's settings: default settings by category and subcategory
+	public function testSettingsReturnTheStoredValueOrTheDefault(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['settings']['switch']['voicemail'] = '/var/lib/freeswitch/storage/voicemail';
+		});
+		$settings = new \settings(array('domain_uuid' => self::DOMAIN));
+
+		$this->assertSame('/var/lib/freeswitch/storage/voicemail', $settings->get('switch', 'voicemail'));
+		$this->assertSame('file', $settings->get('cache', 'method', 'file'));
+	}
+
 	// FusionPBX caches the directory entry of each extension (directory:<ext>@<context>)
 	public function testCacheDeleteIsRecorded(): void
 	{
