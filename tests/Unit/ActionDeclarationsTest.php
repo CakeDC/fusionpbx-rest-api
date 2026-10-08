@@ -24,9 +24,11 @@ class ActionDeclarationsTest extends TestCase
 		'extension-create' => array('extension_add', 'voicemail_add'),
 		'extension-details' => array('extension_view'),
 		'extension-list' => array('extension_view'),
+		'extension-update' => array('extension_edit'),
 		'extension-user-list' => array('extension_view', 'user_view'),
 		'originate' => array('click_to_call_call'),
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
+		'user-details' => array('user_view'),
 		'user-list' => array('user_view'),
 	);
 
