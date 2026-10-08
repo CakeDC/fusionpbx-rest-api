@@ -58,6 +58,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 
 | Action | Permissions |
 |---|---|
+| `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-queue-list` | `call_center_queue_view` |
 | `cdr-details` | `xml_cdr_view` |
 | `cdr-list` | `xml_cdr_view` |
@@ -356,6 +357,13 @@ Call one number (destination_a) and connect the call to another number (destinat
 Note that the call is ended when destination_a ends the call, so if one leg isn't expected to hang up, make it destination_b.
 
 Use `destination_b=*9664` to indefinitely play hold music to destination_a.
+
+## `callcenter-agent-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+
+List the call center agents of a domain, sorted by agent name: `{"data": [...]}`, not paginated. Each item has `user_uuid` (the agent's FusionPBX user), `queues` (the queues the agent serves, `[{"call_center_queue_uuid", "level", "position"}]`, by tier level then position) and `wrap_up_time` (seconds, or `null` when not set). FusionPBX agents without a user are left out, as agents are identified by `user_uuid`. A domain without agents returns `{"data": []}`.
 
 ## `callcenter-queue-list`
 | Parameter     | Required | Description |

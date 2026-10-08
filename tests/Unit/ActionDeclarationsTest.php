@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 class ActionDeclarationsTest extends TestCase
 {
 	private const PERMISSIONS = array(
+		'callcenter-agent-list' => array('call_center_agent_view', 'call_center_tier_view'),
 		'callcenter-queue-list' => array('call_center_queue_view'),
 		'cdr-details' => array('xml_cdr_view'),
 		'cdr-list' => array('xml_cdr_view'),
