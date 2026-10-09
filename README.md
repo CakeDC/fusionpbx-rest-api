@@ -58,6 +58,18 @@ Each action needs these FusionPBX permissions in the key user's groups:
 
 | Action | Permissions |
 |---|---|
+| `call-answer` | `rest_api_call_control` |
+| `call-hangup` | `call_active_hangup` |
+| `call-hold` | `rest_api_call_control` |
+| `call-list` | `call_active_view` |
+| `call-resume` | `rest_api_call_control` |
+| `call-transfer` | `call_active_transfer` |
+| `call-transfer-attended` | `call_active_transfer` |
+| `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
+| `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
+| `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
+| `callcenter-queue-list` | `call_center_queue_view` |
+| `callcenter-queue-status` | `call_center_active_view` |
 | `cdr-details` | `xml_cdr_view` |
 | `cdr-list` | `xml_cdr_view` |
 | `cdr-search` | `xml_cdr_view` |
@@ -75,7 +87,10 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `extension-update` | `extension_edit`, plus per field: `caller_id_name` needs `effective_caller_id_name`, `outbound_caller_id_name`, `emergency_caller_id_name`; `caller_id_number` the same three `*_number` permissions; `enabled` needs `extension_enabled`; `user_uuid` needs `extension_user_add` (`extension_user_delete` for `null`) |
 | `extension-user-list` | `extension_view`, `user_view` |
 | `originate` | `click_to_call_call` |
+| `recording-details` | `call_recording_view` |
+| `recording-download` | `call_recording_download` |
 | `ringgroup-create` | `ring_group_add`, `ring_group_destination_add`, `dialplan_add` |
+| `ringgroup-delete` | `ring_group_delete`, `ring_group_user_delete`, `ring_group_destination_delete`, `dialplan_delete`, `dialplan_detail_delete` |
 | `ringgroup-details` | `ring_group_view`, `ring_group_destination_view` |
 | `ringgroup-list` | `ring_group_view`, `ring_group_destination_view` |
 | `ringgroup-update` | `ring_group_edit`, plus `dialplan_edit` to change `name` and `ring_group_destination_add`, `ring_group_destination_delete` to change `destinations` |
@@ -107,8 +122,11 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 ## Upgrading from earlier versions
 
 From 1.0.0:
+- `originate` calls `destination_a` first, as documented (it used to call `destination_b` first), and answers `201` with the call (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`) instead of `{"success": ..., "call_uuid": ...}`. A call FreeSWITCH can't place now answers `500` instead of `200` with `success: false`.
+- Run Advanced → Upgrade → Permission Defaults: it adds the plugin's `rest_api_call_control` permission (to the superadmin and admin groups), which the call control actions need.
 - `extension-create` and `extension-details` return `enabled` as a JSON boolean, like `extension-list`, whatever the database's column type (it was `"true"`/`"false"` text on sqlite and mysql).
 - `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
+- `ringgroup-create` answers `201` instead of `200`, with the ring group as `ringgroup-details` returns it (`ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy`, `destinations`) instead of FusionPBX's columns and `ring_group_destinations`. An existing extension answers `409` instead of `500`. `destinations` may now be a JSON array; invalid destinations answer `400 {"error": "invalid destinations"}` instead of the previous messages.
 - `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
 
 Version 1.0.0 is the first release. Coming from the AccelerateNetworks code, or from a checkout older than 1.0.0, note that it changes how keys work:
@@ -287,16 +305,44 @@ Return one FusionPBX user, to check that a stored `domain_uuid` + `user_uuid` pa
 
 List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
+## `recording-details`
+| Parameter      | Required | Description |
+|----------------|----------|-------------|
+| `domain_uuid`  | no  | Domain to act on. Defaults to the key user's domain |
+| `recording_id` | yes | The recorded call leg's `xml_cdr_uuid` |
+
+Return a call recording's metadata: `recording_id`, `domain_uuid`, `filename` (the leg's `record_name`), `duration` (seconds), `xml_cdr_uuid` and `created` (the leg's `start_stamp`). As in FusionPBX's Call Recordings app, a recording is a call leg with a recording file, other than the ring group legs that lost the race (`LOSE_RACE`), and its id is the leg's `xml_cdr_uuid`. A leg that doesn't exist, belongs to another domain or wasn't recorded returns `404 {"error": "recording not found"}`, and a malformed id returns `400 {"error": "invalid recording_id"}`.
+
+## `recording-download`
+| Parameter      | Required | Description |
+|----------------|----------|-------------|
+| `domain_uuid`  | no  | Domain to act on. Defaults to the key user's domain |
+| `recording_id` | yes | The recorded call leg's `xml_cdr_uuid`, as in `recording-details` |
+
+Download a call recording. Unlike every other action, the response is the audio file itself, not JSON: `200` with `Content-Type` `audio/wav`, `audio/mpeg` (mp3) or `application/octet-stream`, `Content-Length`, and `Content-Disposition: attachment; filename="..."`. The file is streamed, so its size isn't limited by PHP's memory.
+
+The file is read at the leg's `record_path`/`record_name`, as FusionPBX's Call Recordings app does, and only if it is inside FusionPBX's recordings directory (the `switch` → `recordings` default setting, `/var/lib/freeswitch/recordings` when unset); a path outside it, links included, is logged and answers `404`. Errors are JSON as for every action: `404 {"error": "recording not found"}` when the leg doesn't exist, belongs to another domain, wasn't recorded or its file is missing, `400` for a malformed id, and `500` when the file can't be read. Recordings that FusionPBX stores in the database (`call_recordings` → `storage_type` `base64`) aren't supported.
+
 ## `ringgroup-create`
 | Parameter      | Required | Description |
 |----------------|----------|-------------|
-| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
-| `name`         | yes      | name for the ring group |
-| `extension`    | yes      | Extension to route TO the ring group |
-| `destinations` | yes      | JSON array of extensions to send calls from the ring group. Example: `[{"number": "100"}, {"number": "101"}, {"number": "102"}]` |
-| `strategy`     | yes      | one of: `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
+| `domain_uuid`  | no  | Domain to act on. Defaults to the key user's domain |
+| `name`         | yes | Name of the ring group. One line, up to 255 characters |
+| `extension`    | yes | Extension that routes to the ring group: digits, `*`, `#`, optional leading `+` |
+| `destinations` | yes | JSON array of the numbers to ring, e.g. `[{"number": "100"}, {"number": "101"}]`. The same array encoded as a JSON string is still accepted |
+| `strategy`     | yes | `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
 
-Create a ring group
+Create a ring group with its destinations (no delay, 30 s timeout each) and its dialplan, and clear the dialplan cache of the domain as FusionPBX's ring group page does, so its extension routes right away. Answers `201` with the ring group as `ringgroup-details` returns it. A number given twice rings once.
+
+An extension that already has a ring group in the domain returns `409 {"error": "ring group already exists"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
+
+## `ringgroup-delete`
+| Parameter         | Required | Description |
+|-------------------|----------|-------------|
+| `domain_uuid`     | no  | Domain to act on. Defaults to the key user's domain |
+| `ring_group_uuid` | yes | Ring group to delete |
+
+Delete a ring group with its users, destinations, dialplan and dialplan details, as FusionPBX's ring groups page does, and clear the dialplan cache of its context. Answers `204` with no body. A ring group that doesn't exist or belongs to another domain returns `404 {"error": "ring group not found"}`, and a malformed `ring_group_uuid` returns `400 {"error": "invalid ring_group_uuid"}`.
 
 ## `ringgroup-details`
 | Parameter         | Required | Description |
@@ -339,11 +385,141 @@ A missing permission returns `403` with `missing_permissions`, a ring group that
 | `destination_a`    | yes      | the number to call first  |
 | `destination_b`    | yes      | the number to call second |
 
-Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. The selected domain's internal dialplan is used, so internal extensions may be dialed.
+Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. The selected domain's internal dialplan is used, so internal extensions may be dialed. Numbers are digits, `*`, `#` and an optional leading `+`.
+
+Answers `201` with the call as `call-list` returns it (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`, `consulting`), once destination_a has answered. `call_uuid` is the leg that rings destination_a and bridges destination_b; it carries the domain, so `call-hangup`, `call-hold`, `call-resume` and `call-transfer` accept it.
+
+When FreeSWITCH can't place the call it returns `500` with its reason, e.g. `{"error": "call failed: NO_ANSWER"}`, and `500 {"error": "event socket error"}` when the event socket can't be reached. An invalid number returns `400 {"error": "invalid <parameter>"}`.
 
 Note that the call is ended when destination_a ends the call, so if one leg isn't expected to hang up, make it destination_b.
 
 Use `destination_b=*9664` to indefinitely play hold music to destination_a.
+
+## `call-answer`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The ringing call's channel uuid, as `call-list` returns it |
+
+Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain (its `domain_uuid` variable) is checked first: a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding and resuming a call use it too.
+
+## `call-hangup`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The call's channel uuid, as `call-list` returns it |
+
+Hang up a call (`uuid_kill`, as FusionPBX's active calls page does). Answers `204` with no body, also when the call ends on its own between the domain check and `uuid_kill`. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-hold`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The call's channel uuid, as `call-list` returns it |
+
+Put an answered call on hold (`uuid_hold`, never toggled), so the other party hears the hold music, and return it as `call-list` does, with `state` `held`. Holding a call that is already held changes nothing. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses (e.g. the call isn't answered yet), it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+| `extension`   | no | Only the calls of these extensions (an array, or comma separated): one of them called, was called, or is a leg's presence (e.g. a ring group ringing it) |
+
+List the active calls of a domain from FreeSWITCH (`show channels`), one item per call: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number", "consulting"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id.
+
+The legs `show calls` pairs are one call (a ring group pairs its first leg with every leg it rings). The call actions act on the leg they get (holding a leg plays the music to the other one, `call-transfer` transfers the other one), so a call is listed by one of its legs, the one to pass as `call_uuid`: with `extension`, the leg whose presence is one of the extensions (the extension's own phone), else a leg where one of them called or was called; without it, the call's first leg. A call is listed once even when several of the extensions are in it.
+
+`state` comes from the channel's call state: `ringing` (`DOWN`, `DIALING`, `RINGING`, `EARLY`, `RING_WAIT`, or any state FreeSWITCH adds later), `answered` (`ACTIVE`, `UNHELD`), `held` (`HELD`), `ended` (`HANGUP`), and `bridged` for an answered channel that `show calls` pairs with another leg.
+
+`consulting` is the number an agent's call consults in a warm transfer (`call-transfer-attended`), `null` otherwise; the call is then `held`. It is read from the channel (`uuid_getvar`, one or two commands per answered call) and only counts while the consult leg exists. Every call action returns it too.
+
+An invalid `extension` returns `400 {"error": "invalid extension"}`. When the event socket can't be reached or FreeSWITCH doesn't answer with JSON, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-resume`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The held call's channel uuid, as `call-list` returns it |
+
+Take a held call off hold (`uuid_hold off`) and return it as `call-list` does, with `state` `answered` or `bridged`. Resuming a call that isn't held changes nothing. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-transfer`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The agent's call, as `call-list` returns it |
+| `target_type` | yes | `extension`, `ring_group` or `queue` |
+| `target`      | yes | The extension's number or alias, or the ring group's or queue's uuid, in the domain |
+
+Blind-transfer a call to an extension, ring group or call center queue of the domain (`uuid_transfer <call> [-bleg] <number> XML <context>`, the number and context of the target as FusionPBX routes to it). When the call is bridged, the other party is transferred (`-bleg`, as FusionPBX's active calls page parks a call) and the agent's leg is left to end; otherwise the channel itself is transferred.
+
+Either way the agent is done with the call: it is returned as `call-list` returned it before the transfer, with `state` `ended` (the `call_uuid` given, its numbers, `consulting` `null`). The call's domain is checked first, as in `call-answer`. A call of another domain or one that doesn't exist returns `404 {"error": "call not found"}`, a target that isn't in the domain `404 {"error": "target not found"}`, and an unknown `target_type` or invalid target (numbers: digits, `*`, `#`, optional leading `+`; ring groups and queues: uuids) `400`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `call-transfer-attended`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `call_uuid`   | yes | The agent's call, bridged to the caller, as `call-list` returns it |
+| `stage`       | yes | `consult`, `cancel` or `complete` |
+| `target`      | with `consult` | Number to consult (digits, `*`, `#`, optional leading `+`), dialed through the domain's dialplan |
+
+Warm (attended) transfer with FreeSWITCH's `att_xfer`, run on the agent's leg:
+
+* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time, ringing or answered (`400 {"error": "consultation already in progress"}`). Returns the agent's call with `state` `held` and `consulting` set to `target`.
+* `cancel`: the consultation is hung up, ringing or answered, and the agent is back with the caller. Returns the agent's call.
+* `complete`: the agent's leg is hung up and the caller is bridged to the consulted party. Only once the consulted party has answered and talks with the agent (`400 {"error": "consultation not answered"}`, the consultation goes on); otherwise hanging up the agent would end the call. Returns the agent's call as it was before, with `state` `ended`.
+
+The consultation is noted on the agent's channel itself (the channel variables `rest_api_consult_uuid` and `rest_api_consult_target`), so nothing is kept between requests. `att_xfer` also ends a consultation on its own, without clearing the note: when the target doesn't answer, is busy or unreachable, or hangs up after answering, the agent is back with the caller. So every stage reads the consult leg (`uuid_dump`), and a note whose leg is gone counts as no consultation: `consult` starts a new one, and `cancel` or `complete` clear the note and return `400 {"error": "no consultation in progress"}`. `uuid_broadcast` only queues `att_xfer`, so for a moment after `consult` the consult leg may not exist yet. The call's domain is checked first, as in `call-answer`, and the usual `400`, `404` and `500` apply.
+
+**Not yet verified on a real call.** The commands follow FreeSWITCH's documentation of `att_xfer` (`uuid_broadcast <agent> att_xfer::{origination_uuid=<uuid>}loopback/<target>/<domain> aleg`, then `uuid_kill` of the consult leg or of the agent's leg); try a warm transfer on a FusionPBX 5.6.5 test system before relying on it.
+
+## `callcenter-agent-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+
+List the call center agents of a domain, sorted by agent name: `{"data": [...]}`, not paginated. Each item has `user_uuid` (the agent's FusionPBX user), `queues` (the queues the agent serves, `[{"call_center_queue_uuid", "level", "position"}]`, by tier level then position) and `wrap_up_time` (seconds, or `null` when not set). FusionPBX agents without a user are left out, as agents are identified by `user_uuid`. A domain without agents returns `{"data": []}`.
+
+## `callcenter-agent-state`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `user_uuid`   | yes | FusionPBX user whose call center agent to change |
+| `state`       | yes | `Waiting`, `Receiving`, `In a queue call`, `Idle` or `Reserved`, the states mod_callcenter knows |
+
+Set the call center state of a user's agent in FreeSWITCH's mod_callcenter (`callcenter_config agent set state`), for example `Waiting`, and return `{"user_uuid", "status", "state", "wrap_up_until"}` read live as `callcenter-agent-status` does. The state only lives in mod_callcenter; FusionPBX keeps no copy of it. A user with several agents in the domain is answered for the first by agent name.
+
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
+
+## `callcenter-agent-status`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
+| `user_uuid`   | yes | FusionPBX user whose call center agent to read or change |
+| `status`      | no  | New status: `Available`, `Available (On Demand)`, `On Break` or `Logged Out`. Without it the status is only read |
+
+Read, or set, the call center status of a user's agent: `{"user_uuid", "status", "state", "wrap_up_until"}`, read live from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config agent list <agent>`). `state` is `Unknown`, `Waiting`, `Receiving`, `In a queue call`, `Idle` or `Reserved`; mod_callcenter has no wrap-up state, an agent stays `Waiting` during its wrap-up time. `wrap_up_until` is when the agent can take queue calls again after the last one (UTC, e.g. `2026-10-10T09:30:00Z`), or `null` when it can already: the later of the end of its last call plus its wrap-up time and its ready time (set by a reject, busy or no-answer delay), as mod_callcenter decides when it offers a call. An agent mod_callcenter doesn't know returns `500 {"error": "event socket error"}`. A user with several agents in the domain is answered for the first by agent name.
+
+Setting runs the commands of FusionPBX's agent status page (`callcenter_config agent set status`, and `agent set state ... 'Waiting'` after `Available` or `Logged Out`) and saves the status on the agent, so FreeSWITCH keeps it after a restart. It doesn't change the user's own status (`user_status`) or the BLF lamps the page also updates.
+
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, an unknown status or malformed uuid returns `400`, and setting without `call_center_agent_edit` returns `403`. When the event socket can't be reached or FreeSWITCH refuses a command, it returns `500 {"error": "event socket error"}` and logs the reason; a refused status isn't saved.
+
+## `callcenter-queue-list`
+| Parameter     | Required | Description |
+|---------------|----------|-------------|
+| `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
+
+List the call center queues of a domain, sorted by extension: `{"data": [...]}`, not paginated. Each item has `call_center_queue_uuid`, `name`, `extension`, `strategy` (mod_callcenter's, e.g. `ring-all`) and `queue_tier_rules_wait_second` (FusionPBX's "tier rule wait second", an integer, or `null` when it isn't set). A domain without queues returns `{"data": []}`.
+
+## `callcenter-queue-status`
+| Parameter                | Required | Description |
+|--------------------------|----------|-------------|
+| `domain_uuid`            | no  | Domain to act on. Defaults to the key user's domain |
+| `call_center_queue_uuid` | yes | Queue to look at |
+
+Live counts of a call center queue, read from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config queue list members|agents <extension>@<domain>`, as FusionPBX's Active Call Center page does): `call_center_queue_uuid`, `waiting_calls` (calls waiting for an agent, member state `Waiting`), `longest_wait_seconds` (how long the caller who has waited longest has been waiting, from its `joined_epoch`; `0` when nobody waits), `member_count` (every call in the queue, waiting or with an agent), `agent_count` (agents assigned to the queue, whatever their status) and `agents_available` (agents whose status is `Available` or `Available (On Demand)` and whose state is `Waiting`). A queue that doesn't exist or belongs to another domain returns `404 {"error": "queue not found"}`, and a malformed uuid returns `400 {"error": "invalid call_center_queue_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `cdr-search`
 | Parameter        | Required | Description |
@@ -426,7 +602,7 @@ composer test
 * `tests/Unit`: the `lib/` helpers and every action, each test in its own PHP process.
 * `tests/Http`: `rest.php` and the key management pages, served by PHP's built-in web server from a temporary FusionPBX-like document root.
 
-The in-memory database only shows that the plugin's SQL does what it should, not that PostgreSQL accepts it. The `pgsql` suite (`tests/Pgsql`) runs the `cdr-search` and `cdr-details` tests, and the App Defaults index, on a real PostgreSQL with FusionPBX 5.6.5's `v_xml_cdr` columns, through PDO the way FusionPBX's `database` class uses it. It needs Docker:
+The in-memory database only shows that the plugin's SQL does what it should, not that PostgreSQL accepts it. The `pgsql` suite (`tests/Pgsql`) runs the `cdr-search`, `cdr-details` and `recording-details` tests, and the App Defaults index, on a real PostgreSQL with FusionPBX 5.6.5's `v_xml_cdr` columns, through PDO the way FusionPBX's `database` class uses it. It needs Docker:
 
 ```
 composer test-pgsql                         # PostgreSQL 18 (the FusionPBX installer's default), PHP 8.3

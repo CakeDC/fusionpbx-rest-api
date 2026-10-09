@@ -87,25 +87,6 @@ const REST_API_DESTINATION_FIELDS = array(
     "update_date"
 );
 
-const REST_API_RING_GROUP_FIELDS = array(
-    "ring_group_uuid",
-    "domain_uuid",
-    "ring_group_name",
-    "ring_group_extension",
-    "ring_group_strategy",
-    "ring_group_enabled",
-    "ring_group_description",
-    "dialplan_uuid"
-);
-
-const REST_API_RING_GROUP_DESTINATION_FIELDS = array(
-    "ring_group_destination_uuid",
-    "destination_number",
-    "destination_delay",
-    "destination_timeout",
-    "destination_enabled"
-);
-
 // From v_ring_groups rows (ring_group_uuid, domain_uuid, ring_group_name,
 // ring_group_extension, ring_group_strategy), with the destinations of all
 // of them read in one query. only enabled destinations, the ones FusionPBX
@@ -285,6 +266,7 @@ function rest_api_destination_transfer_data($database, $domain_uuid, $type, $tar
         "ring_group" => "SELECT ring_group_extension, ring_group_context FROM v_ring_groups WHERE domain_uuid = :domain_uuid AND ring_group_uuid = :target",
         "ivr" => "SELECT ivr_menu_extension, ivr_menu_context FROM v_ivr_menus WHERE domain_uuid = :domain_uuid AND ivr_menu_uuid = :target",
         "voicemail" => "SELECT voicemail_id FROM v_voicemails WHERE domain_uuid = :domain_uuid AND voicemail_id = :target",
+        "queue" => "SELECT queue_extension, queue_context FROM v_call_center_queues WHERE domain_uuid = :domain_uuid AND call_center_queue_uuid = :target",
     );
     $parameters = array("domain_uuid" => $domain_uuid, "target" => $target);
     if($type === "extension") {
@@ -306,6 +288,8 @@ function rest_api_destination_transfer_data($database, $domain_uuid, $type, $tar
             return $record["ring_group_extension"]." XML ".($record["ring_group_context"] ?: $domain_name);
         case "ivr":
             return $record["ivr_menu_extension"]." XML ".($record["ivr_menu_context"] ?: $domain_name);
+        case "queue":
+            return $record["queue_extension"]." XML ".($record["queue_context"] ?: $domain_name);
         default:
             return "*99".$record["voicemail_id"]." XML ".$domain_name;
     }
@@ -383,6 +367,19 @@ function rest_api_format_domain($domain) {
 function rest_api_format_user($user) {
     $user['user_enabled'] = in_array($user['user_enabled'], array(true, 1, "1", "t", "true"), true);
     return $user;
+}
+
+// a v_call_center_queues row as the API returns it. FusionPBX names the
+// wait queue_tier_rule_wait_second, a numeric column (text from Postgres)
+function rest_api_format_call_center_queue($queue) {
+    $wait = $queue["queue_tier_rule_wait_second"];
+    return array(
+        "call_center_queue_uuid" => $queue["call_center_queue_uuid"],
+        "name" => $queue["queue_name"],
+        "extension" => $queue["queue_extension"],
+        "strategy" => $queue["queue_strategy"],
+        "queue_tier_rules_wait_second" => is_numeric($wait) ? (int)$wait : null,
+    );
 }
 
 // every extension response: enabled is a boolean on Postgres but

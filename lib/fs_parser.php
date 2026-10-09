@@ -15,6 +15,11 @@ function parse_fs($command) {
     return array("error" => "freeswitch rejected request", "details" => $status);
   }
 
+  // mod_callcenter prints the header with the first row only, so an empty
+  // list is a bare +OK
+  if (!$lines) {
+    return array();
+  }
   $keys = explode("|", array_shift($lines));
 
   $out = array();
@@ -27,4 +32,45 @@ function parse_fs($command) {
   }
 
   return $out;
+}
+
+// the reply of a command that answers a bare value ("Available", "+OK"),
+// trimmed, or an error array like parse_fs()'s. 5.6.5's event_socket_request()
+// returns false when it can't reach the event socket
+function fs_api_value($command) {
+  $fp = event_socket_create($_SESSION['event_socket_ip_address'] ?? null, $_SESSION['event_socket_port'] ?? null, $_SESSION['event_socket_password'] ?? null);
+  if (!$fp) {
+    return array("error" => "Failed to connect to event socket");
+  }
+
+  $response = trim((string)event_socket_request($fp, $command));
+  if ($response === "" || strpos($response, "-ERR") === 0) {
+    return array("error" => "freeswitch rejected request", "details" => $response);
+  }
+  return $response;
+}
+
+// the decoded reply of a command answering JSON ("show channels as json"),
+// or an error array like fs_api_value()'s
+function fs_api_json($command) {
+  $reply = fs_api_value($command);
+  if (is_array($reply)) {
+    return $reply;
+  }
+  $json = json_decode($reply, true);
+  if (!is_array($json)) {
+    return array("error" => "freeswitch reply is not JSON", "details" => $reply);
+  }
+  return $json;
+}
+
+// runs an event socket command for an action; on failure logs why and gives
+// the 500 the action answers
+function rest_api_fs_command($command) {
+  $reply = fs_api_value($command);
+  if (is_array($reply)) {
+    error_log("rest_api: ".$command." failed: ".json_encode($reply));
+    return array("error" => "event socket error", "code" => 500);
+  }
+  return $reply;
 }

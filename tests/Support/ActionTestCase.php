@@ -23,6 +23,10 @@ abstract class ActionTestCase extends TestCase
 		require_once FUSIONPBX_FAKES_DIR.'/resources/fakes.php';
 		require_once PLUGIN_DIR.'/lib/input_validation.php';
 		require_once PLUGIN_DIR.'/lib/fields.php';
+		require_once PLUGIN_DIR.'/lib/fs_parser.php';
+		require_once PLUGIN_DIR.'/lib/call_center.php';
+		require_once PLUGIN_DIR.'/lib/recordings.php';
+		require_once PLUGIN_DIR.'/lib/calls.php';
 		$_SESSION = array();
 		FakeStore::reset($this->tables());
 		require PLUGIN_DIR.'/actions/'.$this->action().'.php';
@@ -74,6 +78,14 @@ abstract class ActionTestCase extends TestCase
 		FakeStore::update(function (&$state) {
 			$state['select_fails'] = true;
 		});
+	}
+
+	/** File permissions don't hold root back, so a test that needs them can't run as root. */
+	protected function skipAsRoot(): void
+	{
+		if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+			$this->markTestSkipped('root ignores file permissions');
+		}
 	}
 
 	protected function state(): array
