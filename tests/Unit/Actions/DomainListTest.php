@@ -46,6 +46,15 @@ class DomainListTest extends ActionTestCase
 		), $this->list());
 	}
 
+	// without a user domain in the context nothing matches: fail closed, never every domain
+	public function testListsNothingWithoutAUserDomain(): void
+	{
+		$this->assertSame(array(
+			'data' => array(),
+			'pagination' => array('page' => 1, 'per_page' => 25, 'total' => 0),
+		), $this->runAction(array(), array('domain_explicit' => false, 'user_domain_uuid' => null)));
+	}
+
 	// disabled domains are listed too, so an administrator can see them
 	public function testListsEveryDomainByNameWithDomainSelect(): void
 	{
