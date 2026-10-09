@@ -80,6 +80,14 @@ abstract class ActionTestCase extends TestCase
 		});
 	}
 
+	/** File permissions don't hold root back, so a test that needs them can't run as root. */
+	protected function skipAsRoot(): void
+	{
+		if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+			$this->markTestSkipped('root ignores file permissions');
+		}
+	}
+
 	protected function state(): array
 	{
 		return FakeStore::read();

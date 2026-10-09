@@ -36,14 +36,31 @@ function do_action($body) {
         return array("error" => "event socket error", "code" => 500);
     }
 
-    // members are every call in the queue; waiting ones have no agent yet
-    $waiting = array_filter($members, function($member) {
-        return ($member["state"] ?? null) === "Waiting";
-    });
+    // members are every call in the queue; waiting ones have no agent yet.
+    // FreeSWITCH's clock may be ahead of this host's
+    $waiting = 0;
+    $longest_wait = 0;
+    foreach($members as $member) {
+        if(($member["state"] ?? null) === "Waiting") {
+            $waiting++;
+            if(is_numeric($member["joined_epoch"] ?? null) && (int)$member["joined_epoch"] > 0) {
+                $longest_wait = max($longest_wait, time() - (int)$member["joined_epoch"]);
+            }
+        }
+    }
+    // an agent ready for a queue call
+    $available = 0;
+    foreach($agents as $agent) {
+        if(in_array($agent["status"] ?? null, array("Available", "Available (On Demand)"), true) && ($agent["state"] ?? null) === "Waiting") {
+            $available++;
+        }
+    }
     return array(
         "call_center_queue_uuid" => $queue_uuid,
-        "waiting_calls" => count($waiting),
+        "waiting_calls" => $waiting,
+        "longest_wait_seconds" => $longest_wait,
         "member_count" => count($members),
         "agent_count" => count($agents),
+        "agents_available" => $available,
     );
 }

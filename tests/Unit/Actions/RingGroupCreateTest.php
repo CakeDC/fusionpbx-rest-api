@@ -52,6 +52,15 @@ class RingGroupCreateTest extends ActionTestCase
 		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
 	}
 
+	// as ring_group_edit.php does, so the extension routes right away rather
+	// than once the cached dialplan expires
+	public function testClearsTheDialplanCacheOfTheContext(): void
+	{
+		$this->runAction($this->body());
+
+		$this->assertSame(array('dialplan:tenant1.example.com'), $this->state()['cache_deleted']);
+	}
+
 	public function testAnswersCreatedWithTheRingGroupAsRingGroupDetailsReturnsIt(): void
 	{
 		$result = $this->runAction($this->body());
@@ -154,6 +163,7 @@ class RingGroupCreateTest extends ActionTestCase
 
 		$this->assertSame(array('error' => 'error adding ring group', 'code' => 500), $this->runAction($this->body()));
 		$this->assertCount(1, $this->state()['tables']['v_ring_groups']);
+		$this->assertSame(array(), $this->state()['cache_deleted']);
 	}
 
 	public function testAnswersNotFoundForAnUnknownDomain(): void

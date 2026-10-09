@@ -69,7 +69,7 @@ class CallAnswerTest extends ActionTestCase
 	public function testAnswersTheCallAndReturnsIt(): void
 	{
 		$this->assertSame(
-			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'answered', 'caller_id_number' => '+15550001111', 'destination_number' => '101'),
+			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'answered', 'caller_id_number' => '+15550001111', 'destination_number' => '101', 'consulting' => null),
 			$this->answer()
 		);
 		$this->assertSame(array(self::DUMP, self::ANSWER, self::DUMP), $this->state()['esl_commands']);

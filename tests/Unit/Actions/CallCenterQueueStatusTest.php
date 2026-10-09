@@ -49,9 +49,11 @@ class CallCenterQueueStatusTest extends ActionTestCase
 		return array($result, $logged);
 	}
 
-	private static function member(string $uuid, string $state): string
+	/** A caller in the queue, who joined it $waited seconds ago. */
+	private static function member(string $uuid, string $state, int $waited = 60): string
 	{
-		return '800@tenant1.example.com|single_box|'.$uuid.'|'.$uuid.'|5551000|Caller|1759900000|1759900000|0|0|0|0|0||single_box|'.$state.'|0';
+		$joined = time() - $waited;
+		return '800@tenant1.example.com|single_box|'.$uuid.'|'.$uuid.'|5551000|Caller|'.$joined.'|'.$joined.'|0|0|0|0|0||single_box|'.$state.'|0';
 	}
 
 	private static function agent(string $name, string $status, string $state): string
@@ -59,11 +61,13 @@ class CallCenterQueueStatusTest extends ActionTestCase
 		return $name.'|single_box||callback|user/101@tenant1.example.com|'.$status.'|'.$state.'|3|10|10|60|0|0|0|0|1759900000|0|4|120|0|0';
 	}
 
+	// mod_callcenter prints the header with the first row only
+	// (list_result_callback), so an empty list is a bare +OK
 	private function respond(array $members, array $agents): void
 	{
 		\FakeStore::update(function (&$state) use ($members, $agents) {
-			$state['esl_responses'][self::MEMBERS] = implode("\n", array_merge(array(self::MEMBERS_HEADER), $members, array('+OK')))."\n";
-			$state['esl_responses'][self::AGENTS] = implode("\n", array_merge(array(self::AGENTS_HEADER), $agents, array('+OK')))."\n";
+			$state['esl_responses'][self::MEMBERS] = implode("\n", array_merge($members ? array(self::MEMBERS_HEADER) : array(), $members, array('+OK')))."\n";
+			$state['esl_responses'][self::AGENTS] = implode("\n", array_merge($agents ? array(self::AGENTS_HEADER) : array(), $agents, array('+OK')))."\n";
 		});
 	}
 
@@ -72,23 +76,55 @@ class CallCenterQueueStatusTest extends ActionTestCase
 		return $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'call_center_queue_uuid' => $queue_uuid));
 	}
 
-	// members are every call in the queue; waiting ones aren't with an agent yet
+	// members are every call in the queue; waiting ones aren't with an agent
+	// yet. an available agent is Available (or on demand) and Waiting for a call
 	public function testCountsWaitingCallsMembersAndAgents(): void
 	{
 		$this->respond(
-			array(self::member('m1', 'Waiting'), self::member('m2', 'Answered'), self::member('m3', 'Waiting')),
-			array(self::agent('ana', 'Available', 'Waiting'), self::agent('ben', 'On Break', 'Waiting'))
+			array(self::member('m1', 'Waiting', 30), self::member('m2', 'Answered', 300), self::member('m3', 'Waiting', 90)),
+			array(
+				self::agent('ana', 'Available', 'Waiting'),
+				self::agent('ben', 'On Break', 'Waiting'),
+				self::agent('cid', 'Available (On Demand)', 'Waiting'),
+				self::agent('dan', 'Available', 'In a queue call'),
+				self::agent('eve', 'Available', 'Receiving'),
+				self::agent('fay', 'Logged Out', 'Waiting'),
+			)
 		);
 
-		$this->assertSame(array('call_center_queue_uuid' => self::SALES, 'waiting_calls' => 2, 'member_count' => 3, 'agent_count' => 2), $this->queueStatus());
+		$status = $this->queueStatus();
+
+		// the clock may tick while the action runs
+		$this->assertContains($status['longest_wait_seconds'], array(90, 91, 92));
+		$status['longest_wait_seconds'] = 90;
+		$this->assertSame(array('call_center_queue_uuid' => self::SALES, 'waiting_calls' => 2, 'longest_wait_seconds' => 90, 'member_count' => 3, 'agent_count' => 6, 'agents_available' => 2), $status);
 		$this->assertSame(array(self::MEMBERS, self::AGENTS), $this->state()['esl_commands']);
 	}
 
+	// with the real reply of mod_callcenter, a bare +OK
 	public function testCountsAnEmptyQueue(): void
 	{
 		$this->respond(array(), array());
 
-		$this->assertSame(array('call_center_queue_uuid' => self::SALES, 'waiting_calls' => 0, 'member_count' => 0, 'agent_count' => 0), $this->queueStatus());
+		$this->assertSame(array('call_center_queue_uuid' => self::SALES, 'waiting_calls' => 0, 'longest_wait_seconds' => 0, 'member_count' => 0, 'agent_count' => 0, 'agents_available' => 0), $this->queueStatus());
+	}
+
+	// callers with an agent don't wait any more
+	public function testWaitsNothingWhenNobodyWaits(): void
+	{
+		$this->respond(array(self::member('m1', 'Answered', 300)), array(self::agent('ana', 'Available', 'In a queue call')));
+
+		$status = $this->queueStatus();
+
+		$this->assertSame(array(1, 0, 0), array($status['member_count'], $status['waiting_calls'], $status['longest_wait_seconds']));
+	}
+
+	// FreeSWITCH may run on another host whose clock is ahead
+	public function testNeverWaitsLessThanNothing(): void
+	{
+		$this->respond(array(self::member('m1', 'Waiting', -5)), array());
+
+		$this->assertSame(0, $this->queueStatus()['longest_wait_seconds']);
 	}
 
 	// FusionPBX stores uuids in lower case

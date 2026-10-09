@@ -158,6 +158,7 @@ class RecordingDownloadTest extends ActionTestCase
 
 	public function testAnswers500WhenTheFileCantBeRead(): void
 	{
+		$this->skipAsRoot();
 		chmod($this->day.'/c1.wav', 0);
 
 		$this->assertSame(array('error' => 'recording file can not be read', 'code' => 500), $this->download());

@@ -9,9 +9,12 @@ function do_action($body) {
     if(isset($call["error"])) {
         return $call;
     }
-    $reply = rest_api_fs_command("api uuid_kill ".$call["Unique-ID"]);
-    if(is_array($reply)) {
-        return $reply;
+    // the call may have ended since the check: it is over, as asked
+    $command = "api uuid_kill ".$call["Unique-ID"];
+    $reply = fs_api_value($command);
+    if(is_array($reply) && strpos($reply["details"] ?? "", "-ERR No such channel") !== 0) {
+        error_log("rest_api: ".$command." failed: ".json_encode($reply));
+        return array("error" => "event socket error", "code" => 500);
     }
     return array("code" => 204);
 }

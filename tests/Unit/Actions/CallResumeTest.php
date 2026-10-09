@@ -66,11 +66,41 @@ class CallResumeTest extends ActionTestCase
 		return array($result, $logged);
 	}
 
+	// every call control response carries the number a warm transfer
+	// consults, while its consult leg exists
+	public function testReturnsTheConsultationOfTheCall(): void
+	{
+		$consult = 'f0000000-0000-4000-8000-000000000003';
+		$noted = array('variable_rest_api_consult_uuid' => $consult, 'variable_rest_api_consult_target' => '102');
+		$this->replies(array(self::dump($noted), self::dump(array('Channel-Call-State' => 'ACTIVE') + $noted)));
+		\FakeStore::update(function (&$state) use ($consult) {
+			$state['esl_responses']['api uuid_dump '.$consult.' json'] = json_encode(array('Unique-ID' => $consult, 'Answer-State' => 'answered'))."\n";
+		});
+
+		$result = $this->resume();
+
+		$this->assertSame(array('held', '102'), array($result['state'], $result['consulting']));
+	}
+
+	// att_xfer ended the consultation on its own and left the note behind
+	public function testReturnsNoConsultationWhenItsLegIsGone(): void
+	{
+		$noted = array('variable_rest_api_consult_uuid' => 'f0000000-0000-4000-8000-000000000003', 'variable_rest_api_consult_target' => '102');
+		$this->replies(array(self::dump($noted), self::dump(array('Channel-Call-State' => 'ACTIVE') + $noted)));
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses']['api uuid_dump f0000000-0000-4000-8000-000000000003 json'] = "-ERR No such channel!\n";
+		});
+
+		$result = $this->resume();
+
+		$this->assertSame(array('bridged', null), array($result['state'], $result['consulting']));
+	}
+
 	// still bridged to the other party once off hold
 	public function testTakesTheCallOffHoldAndReturnsIt(): void
 	{
 		$this->assertSame(
-			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'bridged', 'caller_id_number' => '101', 'destination_number' => '+15550001111'),
+			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'bridged', 'caller_id_number' => '101', 'destination_number' => '+15550001111', 'consulting' => null),
 			$this->resume()
 		);
 		$this->assertSame(array(self::DUMP, self::RESUME, self::DUMP), $this->state()['esl_commands']);

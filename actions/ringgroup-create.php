@@ -126,6 +126,10 @@ function do_action($body) {
         return array("error" => "error adding ring group", "code" => 500);
     }
 
+    // as ring_group_edit.php does, so the extension routes right away
+    $cache = new cache;
+    $cache->delete("dialplan:".$domain_name);
+
     $sql = "SELECT ring_group_uuid, domain_uuid, ring_group_name, ring_group_extension, ring_group_strategy FROM v_ring_groups WHERE ring_group_uuid = :ring_group_uuid";
     $rows = $database->select($sql, array("ring_group_uuid" => $ring_group_uuid), 'all');
     $ring_groups = is_array($rows) && $rows ? rest_api_format_ring_groups($database, $rows) : false;

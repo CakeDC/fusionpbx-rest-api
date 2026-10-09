@@ -332,7 +332,7 @@ The file is read at the leg's `record_path`/`record_name`, as FusionPBX's Call R
 | `destinations` | yes | JSON array of the numbers to ring, e.g. `[{"number": "100"}, {"number": "101"}]`. The same array encoded as a JSON string is still accepted |
 | `strategy`     | yes | `simultaneous`, `sequence`, `enterprise`, `rollover` or `random` |
 
-Create a ring group with its destinations (no delay, 30 s timeout each) and its dialplan. Answers `201` with the ring group as `ringgroup-details` returns it. A number given twice rings once.
+Create a ring group with its destinations (no delay, 30 s timeout each) and its dialplan, and clear the dialplan cache of the domain as FusionPBX's ring group page does, so its extension routes right away. Answers `201` with the ring group as `ringgroup-details` returns it. A number given twice rings once.
 
 An extension that already has a ring group in the domain returns `409 {"error": "ring group already exists"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
 
@@ -387,7 +387,7 @@ A missing permission returns `403` with `missing_permissions`, a ring group that
 
 Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. The selected domain's internal dialplan is used, so internal extensions may be dialed. Numbers are digits, `*`, `#` and an optional leading `+`.
 
-Answers `201` with the call as `call-list` returns it (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`), once destination_a has answered. `call_uuid` is the leg that rings destination_a and bridges destination_b; it carries the domain, so `call-hangup`, `call-hold`, `call-resume` and `call-transfer` accept it.
+Answers `201` with the call as `call-list` returns it (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`, `consulting`), once destination_a has answered. `call_uuid` is the leg that rings destination_a and bridges destination_b; it carries the domain, so `call-hangup`, `call-hold`, `call-resume` and `call-transfer` accept it.
 
 When FreeSWITCH can't place the call it returns `500` with its reason, e.g. `{"error": "call failed: NO_ANSWER"}`, and `500 {"error": "event socket error"}` when the event socket can't be reached. An invalid number returns `400 {"error": "invalid <parameter>"}`.
 
@@ -411,7 +411,7 @@ FusionPBX has no permission for answering a call, so the plugin adds `rest_api_c
 | `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
 | `call_uuid`   | yes | The call's channel uuid, as `call-list` returns it |
 
-Hang up a call (`uuid_kill`, as FusionPBX's active calls page does). Answers `204` with no body. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+Hang up a call (`uuid_kill`, as FusionPBX's active calls page does). Answers `204` with no body, also when the call ends on its own between the domain check and `uuid_kill`. The call's domain is checked first, as in `call-answer`: a call of another domain or one that doesn't exist returns `404 {"error": "call not found"}` and is not touched, and a malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `call-hold`
 | Parameter     | Required | Description |
@@ -425,11 +425,15 @@ Put an answered call on hold (`uuid_hold`, never toggled), so the other party he
 | Parameter     | Required | Description |
 |---------------|----------|-------------|
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
-| `extension`   | no | Only the calls of this extension: it called, was called, or is the channel's presence (e.g. a ring group ringing it) |
+| `extension`   | no | Only the calls of these extensions (an array, or comma separated): one of them called, was called, or is a leg's presence (e.g. a ring group ringing it) |
 
-List the active calls of a domain from FreeSWITCH (`show channels`), one item per channel: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id.
+List the active calls of a domain from FreeSWITCH (`show channels`), one item per call: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number", "consulting"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id.
+
+The legs `show calls` pairs are one call (a ring group pairs its first leg with every leg it rings). The call actions act on the leg they get (holding a leg plays the music to the other one, `call-transfer` transfers the other one), so a call is listed by one of its legs, the one to pass as `call_uuid`: with `extension`, the leg whose presence is one of the extensions (the extension's own phone), else a leg where one of them called or was called; without it, the call's first leg. A call is listed once even when several of the extensions are in it.
 
 `state` comes from the channel's call state: `ringing` (`DOWN`, `DIALING`, `RINGING`, `EARLY`, `RING_WAIT`, or any state FreeSWITCH adds later), `answered` (`ACTIVE`, `UNHELD`), `held` (`HELD`), `ended` (`HANGUP`), and `bridged` for an answered channel that `show calls` pairs with another leg.
+
+`consulting` is the number an agent's call consults in a warm transfer (`call-transfer-attended`), `null` otherwise; the call is then `held`. It is read from the channel (`uuid_getvar`, one or two commands per answered call) and only counts while the consult leg exists. Every call action returns it too.
 
 An invalid `extension` returns `400 {"error": "invalid extension"}`. When the event socket can't be reached or FreeSWITCH doesn't answer with JSON, it returns `500 {"error": "event socket error"}` and logs the reason.
 
@@ -451,7 +455,7 @@ Take a held call off hold (`uuid_hold off`) and return it as `call-list` does, w
 
 Blind-transfer a call to an extension, ring group or call center queue of the domain (`uuid_transfer <call> [-bleg] <number> XML <context>`, the number and context of the target as FusionPBX routes to it). When the call is bridged, the other party is transferred (`-bleg`, as FusionPBX's active calls page parks a call) and the agent's leg is left to end; otherwise the channel itself is transferred.
 
-Returns the transferred leg as `call-list` does, read again after the transfer, or with `state` `ended` and no numbers if it is already gone. The call's domain is checked first, as in `call-answer`. A call of another domain or one that doesn't exist returns `404 {"error": "call not found"}`, a target that isn't in the domain `404 {"error": "target not found"}`, and an unknown `target_type` or invalid target (numbers: digits, `*`, `#`, optional leading `+`; ring groups and queues: uuids) `400`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+Either way the agent is done with the call: it is returned as `call-list` returned it before the transfer, with `state` `ended` (the `call_uuid` given, its numbers, `consulting` `null`). The call's domain is checked first, as in `call-answer`. A call of another domain or one that doesn't exist returns `404 {"error": "call not found"}`, a target that isn't in the domain `404 {"error": "target not found"}`, and an unknown `target_type` or invalid target (numbers: digits, `*`, `#`, optional leading `+`; ring groups and queues: uuids) `400`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `call-transfer-attended`
 | Parameter     | Required | Description |
@@ -463,11 +467,11 @@ Returns the transferred leg as `call-list` does, read again after the transfer, 
 
 Warm (attended) transfer with FreeSWITCH's `att_xfer`, run on the agent's leg:
 
-* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time (`400 {"error": "consultation already in progress"}`). Returns the agent's call.
-* `cancel`: the consultation is hung up and the agent is back with the caller. Returns the agent's call.
-* `complete`: the agent's leg is hung up and the caller is bridged to the consulted party. Returns the caller's leg (`state` `ended` if it is already gone).
+* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time, ringing or answered (`400 {"error": "consultation already in progress"}`). Returns the agent's call with `state` `held` and `consulting` set to `target`.
+* `cancel`: the consultation is hung up, ringing or answered, and the agent is back with the caller. Returns the agent's call.
+* `complete`: the agent's leg is hung up and the caller is bridged to the consulted party. Only once the consulted party has answered and talks with the agent (`400 {"error": "consultation not answered"}`, the consultation goes on); otherwise hanging up the agent would end the call. Returns the agent's call as it was before, with `state` `ended`.
 
-The consultation is tracked on the agent's channel itself (the channel variables `rest_api_consult_uuid` and `rest_api_consult_caller`), so nothing is kept between requests; `cancel` or `complete` without a consultation in progress returns `400 {"error": "no consultation in progress"}`. The call's domain is checked first, as in `call-answer`, and the usual `400`, `404` and `500` apply.
+The consultation is noted on the agent's channel itself (the channel variables `rest_api_consult_uuid` and `rest_api_consult_target`), so nothing is kept between requests. `att_xfer` also ends a consultation on its own, without clearing the note: when the target doesn't answer, is busy or unreachable, or hangs up after answering, the agent is back with the caller. So every stage reads the consult leg (`uuid_dump`), and a note whose leg is gone counts as no consultation: `consult` starts a new one, and `cancel` or `complete` clear the note and return `400 {"error": "no consultation in progress"}`. `uuid_broadcast` only queues `att_xfer`, so for a moment after `consult` the consult leg may not exist yet. The call's domain is checked first, as in `call-answer`, and the usual `400`, `404` and `500` apply.
 
 **Not yet verified on a real call.** The commands follow FreeSWITCH's documentation of `att_xfer` (`uuid_broadcast <agent> att_xfer::{origination_uuid=<uuid>}loopback/<target>/<domain> aleg`, then `uuid_kill` of the consult leg or of the agent's leg); try a warm transfer on a FusionPBX 5.6.5 test system before relying on it.
 
@@ -483,9 +487,9 @@ List the call center agents of a domain, sorted by agent name: `{"data": [...]}`
 |---------------|----------|-------------|
 | `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
 | `user_uuid`   | yes | FusionPBX user whose call center agent to change |
-| `state`       | yes | `Waiting`, `In a queue call`, `Receiving a call` or `Wrap-up` |
+| `state`       | yes | `Waiting`, `Receiving`, `In a queue call`, `Idle` or `Reserved`, the states mod_callcenter knows |
 
-Set the call center state of a user's agent in FreeSWITCH's mod_callcenter (`callcenter_config agent set state`), for example `Waiting` to end its wrap-up so it takes queue calls again, and return `{"user_uuid", "status", "state"}` read live as `callcenter-agent-status` does. The state only lives in mod_callcenter; FusionPBX keeps no copy of it. A user with several agents in the domain is answered for the first by agent name.
+Set the call center state of a user's agent in FreeSWITCH's mod_callcenter (`callcenter_config agent set state`), for example `Waiting`, and return `{"user_uuid", "status", "state", "wrap_up_until"}` read live as `callcenter-agent-status` does. The state only lives in mod_callcenter; FusionPBX keeps no copy of it. A user with several agents in the domain is answered for the first by agent name.
 
 A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
 
@@ -496,7 +500,7 @@ A user without an agent in the domain returns `404 {"error": "agent not found"}`
 | `user_uuid`   | yes | FusionPBX user whose call center agent to read or change |
 | `status`      | no  | New status: `Available`, `Available (On Demand)`, `On Break` or `Logged Out`. Without it the status is only read |
 
-Read, or set, the call center status of a user's agent: `{"user_uuid", "status", "state"}`, both read live from FreeSWITCH's mod_callcenter through the event socket (`state` is `Waiting`, `In a queue call`, `Receiving a call`, `Wrap-up`...). A user with several agents in the domain is answered for the first by agent name.
+Read, or set, the call center status of a user's agent: `{"user_uuid", "status", "state", "wrap_up_until"}`, read live from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config agent list <agent>`). `state` is `Unknown`, `Waiting`, `Receiving`, `In a queue call`, `Idle` or `Reserved`; mod_callcenter has no wrap-up state, an agent stays `Waiting` during its wrap-up time. `wrap_up_until` is when the agent can take queue calls again after the last one (UTC, e.g. `2026-10-10T09:30:00Z`), or `null` when it can already: the later of the end of its last call plus its wrap-up time and its ready time (set by a reject, busy or no-answer delay), as mod_callcenter decides when it offers a call. An agent mod_callcenter doesn't know returns `500 {"error": "event socket error"}`. A user with several agents in the domain is answered for the first by agent name.
 
 Setting runs the commands of FusionPBX's agent status page (`callcenter_config agent set status`, and `agent set state ... 'Waiting'` after `Available` or `Logged Out`) and saves the status on the agent, so FreeSWITCH keeps it after a restart. It doesn't change the user's own status (`user_status`) or the BLF lamps the page also updates.
 
@@ -515,7 +519,7 @@ List the call center queues of a domain, sorted by extension: `{"data": [...]}`,
 | `domain_uuid`            | no  | Domain to act on. Defaults to the key user's domain |
 | `call_center_queue_uuid` | yes | Queue to look at |
 
-Live counts of a call center queue, read from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config queue list members|agents <extension>@<domain>`, as FusionPBX's Active Call Center page does): `call_center_queue_uuid`, `waiting_calls` (calls waiting for an agent), `member_count` (every call in the queue, waiting or with an agent) and `agent_count` (agents assigned to the queue, whatever their status). A queue that doesn't exist or belongs to another domain returns `404 {"error": "queue not found"}`, and a malformed uuid returns `400 {"error": "invalid call_center_queue_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
+Live counts of a call center queue, read from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config queue list members|agents <extension>@<domain>`, as FusionPBX's Active Call Center page does): `call_center_queue_uuid`, `waiting_calls` (calls waiting for an agent, member state `Waiting`), `longest_wait_seconds` (how long the caller who has waited longest has been waiting, from its `joined_epoch`; `0` when nobody waits), `member_count` (every call in the queue, waiting or with an agent), `agent_count` (agents assigned to the queue, whatever their status) and `agents_available` (agents whose status is `Available` or `Available (On Demand)` and whose state is `Waiting`). A queue that doesn't exist or belongs to another domain returns `404 {"error": "queue not found"}`, and a malformed uuid returns `400 {"error": "invalid call_center_queue_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 ## `cdr-search`
 | Parameter        | Required | Description |

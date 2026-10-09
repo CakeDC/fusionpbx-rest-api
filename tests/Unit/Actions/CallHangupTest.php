@@ -100,14 +100,24 @@ class CallHangupTest extends ActionTestCase
 		$this->assertSame(array(self::DUMP, self::KILL), $this->state()['esl_commands']);
 	}
 
-	public function testAnswers500WhenFreeswitchRefuses(): void
+	// the call can end between the domain check and uuid_kill: it is over,
+	// which is what was asked
+	public function testHangsUpACallThatEndsMeanwhile(): void
 	{
 		$this->replies(self::dump(), "-ERR No such channel!\n");
+
+		$this->assertSame(array('code' => 204), $this->hangup());
+		$this->assertSame(array(self::DUMP, self::KILL), $this->state()['esl_commands']);
+	}
+
+	public function testAnswers500WhenFreeswitchRefuses(): void
+	{
+		$this->replies(self::dump(), "-ERR Operation failed\n");
 
 		list($result, $logged) = $this->hangupLogged();
 
 		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
-		$this->assertStringContainsString('-ERR No such channel!', $logged);
+		$this->assertStringContainsString('-ERR Operation failed', $logged);
 	}
 
 	public function testAnswers500WhenTheEventSocketIsUnavailable(): void

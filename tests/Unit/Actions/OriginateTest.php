@@ -51,7 +51,7 @@ class OriginateTest extends ActionTestCase
 			." '&bridge({".self::LEG_VARIABLES."}loopback/101/tenant1.example.com)'",
 			'api uuid_dump '.self::CALL.' json',
 		), $this->state()['esl_commands']);
-		$this->assertSame(array('call_uuid' => self::CALL, 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'state' => 'answered', 'caller_id_number' => '5551000', 'destination_number' => '101', 'code' => 201), $result);
+		$this->assertSame(array('call_uuid' => self::CALL, 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'state' => 'answered', 'caller_id_number' => '5551000', 'destination_number' => '101', 'consulting' => null, 'code' => 201), $result);
 	}
 
 	// the returned call_uuid is set up front and carries the domain, so

@@ -69,7 +69,7 @@ class CallHoldTest extends ActionTestCase
 	public function testPutsTheCallOnHoldAndReturnsIt(): void
 	{
 		$this->assertSame(
-			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'held', 'caller_id_number' => '101', 'destination_number' => '+15550001111'),
+			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'held', 'caller_id_number' => '101', 'destination_number' => '+15550001111', 'consulting' => null),
 			$this->hold()
 		);
 		$this->assertSame(array(self::DUMP, self::HOLD, self::DUMP), $this->state()['esl_commands']);

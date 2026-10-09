@@ -5,7 +5,8 @@ $required_permissions = array("call_active_transfer");
 // blind transfer of a call of the domain to an extension, ring group or
 // queue of the domain. call_uuid is the agent's call: when it is bridged, the
 // other party is transferred (uuid_transfer -bleg, as FusionPBX's active calls
-// page parks a call), otherwise the channel itself. returns the transferred leg
+// page parks a call), otherwise the channel itself. either way the agent is
+// done with the call, which is returned as ended
 function do_action($body) {
     $types = array("extension", "ring_group", "queue");
     if(!in_array($body->target_type, $types, true)) {
@@ -31,19 +32,10 @@ function do_action($body) {
     if(isset($call["error"])) {
         return $call;
     }
-    $other_leg = strtolower((string)($call["Other-Leg-Unique-ID"] ?? ""));
-    if(is_uuid($other_leg)) {
-        $command = "api uuid_transfer ".$call["Unique-ID"]." -bleg ".$destination;
-        $transferred = $other_leg;
-    } else {
-        $command = "api uuid_transfer ".$call["Unique-ID"]." ".$destination;
-        $transferred = $call["Unique-ID"];
-    }
-    $reply = rest_api_fs_command($command);
+    $bleg = is_uuid(strtolower((string)($call["Other-Leg-Unique-ID"] ?? ""))) ? " -bleg" : "";
+    $reply = rest_api_fs_command("api uuid_transfer ".$call["Unique-ID"].$bleg." ".$destination);
     if(is_array($reply)) {
         return $reply;
     }
-
-    // the transferred leg, which may already be gone
-    return rest_api_call_after($transferred, $body->domain_uuid);
+    return rest_api_call_ended($call, $body->domain_uuid);
 }

@@ -36,6 +36,15 @@ class FsParserTest extends TestCase
 		$this->assertSame(array('api show channels'), FakeStore::read()['esl_commands']);
 	}
 
+	// mod_callcenter prints the header with the first row only, so an empty
+	// list is a bare +OK
+	public function testParsesAnEmptyListAnsweredWithoutAHeader(): void
+	{
+		$this->respondWith("+OK\n");
+
+		$this->assertSame(array(), parse_fs('api callcenter_config queue list members 800@tenant1.example.com'));
+	}
+
 	public function testReturnsAnErrorWhenFreeswitchRejectsTheCommand(): void
 	{
 		$this->respondWith("-ERR no such command\n");

@@ -15,6 +15,11 @@ function parse_fs($command) {
     return array("error" => "freeswitch rejected request", "details" => $status);
   }
 
+  // mod_callcenter prints the header with the first row only, so an empty
+  // list is a bare +OK
+  if (!$lines) {
+    return array();
+  }
   $keys = explode("|", array_shift($lines));
 
   $out = array();

@@ -8,7 +8,8 @@ use RestApi\Test\Support\ActionTestCase;
 /**
  * call-transfer: blind transfer. call_uuid is the agent's call: when it is
  * bridged the other party is transferred (uuid_transfer -bleg, as FusionPBX's
- * active calls page parks a call), otherwise the channel itself.
+ * active calls page parks a call), otherwise the channel itself. Either way
+ * the agent is done with the call, which is returned as ended.
  */
 #[RunTestsInSeparateProcesses]
 class CallTransferTest extends ActionTestCase
@@ -99,41 +100,38 @@ class CallTransferTest extends ActionTestCase
 		);
 	}
 
-	// the other party of a bridged call is sent to the target
+	// the other party of a bridged call is sent to the target, and the
+	// agent's call is over: returned as it was, ended
 	#[DataProvider('targets')]
 	public function testTransfersTheOtherPartyOfABridgedCall(string $type, string $target, string $destination): void
 	{
 		$result = $this->transfer($type, $target);
 
 		$this->assertSame(
-			array('call_uuid' => self::OTHER_LEG, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'ringing', 'caller_id_number' => '+15550001111', 'destination_number' => '101'),
+			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'ended', 'caller_id_number' => '+15550001111', 'destination_number' => '101', 'consulting' => null),
 			$result
 		);
-		$this->assertContains('api uuid_transfer '.self::CALL.' -bleg '.$destination, $this->state()['esl_commands']);
+		$this->assertSame(array('api uuid_dump '.self::CALL.' json', 'api uuid_transfer '.self::CALL.' -bleg '.$destination), $this->state()['esl_commands']);
 	}
 
-	// e.g. a call ringing the agent that isn't answered yet
+	// e.g. a call ringing the agent that isn't answered yet: it goes on, but
+	// is the agent's call no more
 	public function testTransfersTheChannelItselfWhenItIsNotBridged(): void
 	{
 		$this->replies(self::dump(self::CALL, array('Channel-Call-State' => 'RINGING', 'Other-Leg-Unique-ID' => '')), "-ERR No such channel!\n");
-		\FakeStore::update(function (&$state) {
-			$state['esl_responses']['api uuid_dump '.self::CALL.' json'] = array(self::dump(self::CALL, array('Channel-Call-State' => 'RINGING', 'Other-Leg-Unique-ID' => '')), self::dump(self::CALL, array('Channel-Call-State' => 'RINGING', 'Other-Leg-Unique-ID' => '', 'Caller-Destination-Number' => '102')));
-		});
 
 		$result = $this->transfer('extension', '102');
 
-		$this->assertSame(array(self::CALL, 'ringing', '102'), array($result['call_uuid'], $result['state'], $result['destination_number']));
-		$this->assertContains('api uuid_transfer '.self::CALL.' 102 XML tenant1.example.com', $this->state()['esl_commands']);
+		$this->assertSame(
+			array('call_uuid' => self::CALL, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'ended', 'caller_id_number' => '+15550001111', 'destination_number' => '101', 'consulting' => null),
+			$result
+		);
+		$this->assertSame(array('api uuid_dump '.self::CALL.' json', 'api uuid_transfer '.self::CALL.' 102 XML tenant1.example.com'), $this->state()['esl_commands']);
 	}
 
-	// the transferred leg may already be gone when it is read again
-	public function testReportsATransferredLegThatIsGoneAsEnded(): void
+	public function testAcceptsAnUpperCaseCallUuid(): void
 	{
-		$this->replies(self::dump(self::CALL), "-ERR No such channel!\n");
-
-		$result = $this->transfer('extension', '102');
-
-		$this->assertSame(array('call_uuid' => self::OTHER_LEG, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'ended', 'caller_id_number' => null, 'destination_number' => null), $result);
+		$this->assertSame(self::CALL, $this->transfer('extension', '102', strtoupper(self::CALL))['call_uuid']);
 	}
 
 	public static function missingTargets(): array

@@ -4,6 +4,7 @@ namespace RestApi\Test\Unit\Actions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
+use RestApi\Test\Support\CallCenterAgentList;
 
 /**
  * callcenter-agent-state: sets a call center agent's state in mod_callcenter,
@@ -18,8 +19,7 @@ class CallCenterAgentStateTest extends ActionTestCase
 	private const NO_AGENT_USER = 'dddddddd-0000-4000-8000-000000000003';
 	private const OTHER_USER = 'dddddddd-0000-4000-8000-000000000020';
 	private const OTHER_DOMAIN_UUID = 'aaaaaaaa-0000-4000-8000-000000000002';
-	private const GET_STATUS = 'api callcenter_config agent get status '.self::ANA;
-	private const GET_STATE = 'api callcenter_config agent get state '.self::ANA;
+	private const LIST = 'api callcenter_config agent list '.self::ANA;
 
 	protected function action(): string
 	{
@@ -40,8 +40,7 @@ class CallCenterAgentStateTest extends ActionTestCase
 	{
 		parent::setUp();
 		\FakeStore::update(function (&$state) {
-			$state['esl_responses'][self::GET_STATUS] = "Available\n";
-			$state['esl_responses'][self::GET_STATE] = "Waiting\n";
+			$state['esl_responses'][self::LIST] = CallCenterAgentList::reply(CallCenterAgentList::row(self::ANA, 'Available', 'Waiting'));
 			$state['esl_response'] = "+OK\n";
 		});
 	}
@@ -71,14 +70,14 @@ class CallCenterAgentStateTest extends ActionTestCase
 	{
 		$result = $this->agentState('Waiting');
 
-		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'Available', 'state' => 'Waiting'), $result);
-		$this->assertSame(array("api callcenter_config agent set state ".self::ANA." 'Waiting'", self::GET_STATUS, self::GET_STATE), $this->state()['esl_commands']);
+		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'Available', 'state' => 'Waiting', 'wrap_up_until' => null), $result);
+		$this->assertSame(array("api callcenter_config agent set state ".self::ANA." 'Waiting'", self::LIST), $this->state()['esl_commands']);
 		$this->assertSame(array(), $this->state()['saved'], 'FusionPBX keeps no agent state in its database');
 	}
 
 	public static function states(): array
 	{
-		return array(array('Waiting'), array('In a queue call'), array('Receiving a call'), array('Wrap-up'));
+		return array(array('Waiting'), array('Receiving'), array('In a queue call'), array('Idle'), array('Reserved'));
 	}
 
 	#[DataProvider('states')]
@@ -89,10 +88,11 @@ class CallCenterAgentStateTest extends ActionTestCase
 		$this->assertSame("api callcenter_config agent set state ".self::ANA." '".$state."'", $this->state()['esl_commands'][0]);
 	}
 
-	// the state goes into an event socket command, so only the known ones
+	// the state goes into an event socket command, so only the known ones.
+	// mod_callcenter has no wrap-up state and "Unknown" can't be set
 	public function testRejectsAnUnknownState(): void
 	{
-		foreach (array('Idle', "Waiting' ; shutdown", 'waiting', '', array('Waiting')) as $state) {
+		foreach (array('Wrap-up', 'Receiving a call', 'Unknown', "Waiting' ; shutdown", 'waiting', '', array('Waiting')) as $state) {
 			$this->assertSame(array('error' => 'invalid state', 'code' => 400), $this->agentState($state), json_encode($state));
 		}
 		$this->assertSame(array(), $this->state()['esl_commands']);

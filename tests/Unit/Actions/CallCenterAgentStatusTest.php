@@ -4,11 +4,13 @@ namespace RestApi\Test\Unit\Actions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
+use RestApi\Test\Support\CallCenterAgentList;
 
 /**
  * callcenter-agent-status: reads, or with "status" sets, a call center agent's
  * status in mod_callcenter, which knows the agent by its call_center_agent_uuid
- * (as FusionPBX's agent status page does).
+ * (as FusionPBX's agent status page does). The live status, state and wrap-up
+ * come from one "agent list" of the agent.
  */
 #[RunTestsInSeparateProcesses]
 class CallCenterAgentStatusTest extends ActionTestCase
@@ -20,8 +22,7 @@ class CallCenterAgentStatusTest extends ActionTestCase
 	private const NO_AGENT_USER = 'dddddddd-0000-4000-8000-000000000003';
 	private const OTHER_USER = 'dddddddd-0000-4000-8000-000000000020';
 	private const OTHER_DOMAIN_UUID = 'aaaaaaaa-0000-4000-8000-000000000002';
-	private const GET_STATUS = 'api callcenter_config agent get status '.self::ANA;
-	private const GET_STATE = 'api callcenter_config agent get state '.self::ANA;
+	private const LIST = 'api callcenter_config agent list '.self::ANA;
 
 	protected function action(): string
 	{
@@ -47,12 +48,12 @@ class CallCenterAgentStatusTest extends ActionTestCase
 		$this->live('Logged Out', 'Waiting');
 	}
 
-	/** What mod_callcenter answers for the agent's status and state. */
-	private function live(string $status, string $state): void
+	/** What mod_callcenter lists for the agent. */
+	private function live(string $status, string $state, array $times = array()): void
 	{
-		\FakeStore::update(function (&$store) use ($status, $state) {
-			$store['esl_responses'][self::GET_STATUS] = $status."\n";
-			$store['esl_responses'][self::GET_STATE] = $state."\n";
+		$reply = CallCenterAgentList::reply(CallCenterAgentList::row(self::ANA, $status, $state, $times));
+		\FakeStore::update(function (&$store) use ($reply) {
+			$store['esl_responses'][self::LIST] = $reply;
 			$store['esl_response'] = "+OK\n";
 		});
 	}
@@ -91,9 +92,76 @@ class CallCenterAgentStatusTest extends ActionTestCase
 	{
 		$this->live('On Break', 'Waiting');
 
-		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'On Break', 'state' => 'Waiting'), $this->agentStatus());
-		$this->assertSame(array(self::GET_STATUS, self::GET_STATE), $this->state()['esl_commands']);
+		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'On Break', 'state' => 'Waiting', 'wrap_up_until' => null), $this->agentStatus());
+		$this->assertSame(array(self::LIST), $this->state()['esl_commands']);
 		$this->assertSame(array(), $this->state()['saved']);
+	}
+
+	// after a call mod_callcenter offers the agent nothing until its wrap-up
+	// time is over, though its state stays Waiting
+	public function testReportsWhenTheWrapUpEnds(): void
+	{
+		$ended = time() - 4;
+		$this->live('Available', 'Waiting', array('wrap_up_time' => 30, 'last_bridge_end' => $ended));
+
+		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'Available', 'state' => 'Waiting', 'wrap_up_until' => gmdate('Y-m-d\TH:i:s\Z', $ended + 30)), $this->agentStatus());
+	}
+
+	// a reject, busy or no-answer delay sets ready_time; the later one counts,
+	// as when mod_callcenter offers a call
+	public function testReportsALaterReadyTimeAsTheEndOfTheWrapUp(): void
+	{
+		$ready = time() + 50;
+		$this->live('Available', 'Waiting', array('wrap_up_time' => 30, 'last_bridge_end' => time() - 4, 'ready_time' => $ready));
+
+		$this->assertSame(gmdate('Y-m-d\TH:i:s\Z', $ready), $this->agentStatus()['wrap_up_until']);
+	}
+
+	public static function agentsNotInWrapUp(): array
+	{
+		return array(
+			'never on a call' => array(array()),
+			'wrap-up over' => array(array('wrap_up_time' => 30, 'last_bridge_end' => time() - 31)),
+			'no wrap-up time' => array(array('wrap_up_time' => 0, 'last_bridge_end' => time() - 1)),
+			'ready time past' => array(array('ready_time' => time() - 1)),
+		);
+	}
+
+	#[DataProvider('agentsNotInWrapUp')]
+	public function testReportsNoWrapUpWhenItIsOver(array $times): void
+	{
+		$this->live('Available', 'Waiting', $times);
+
+		$this->assertNull($this->agentStatus()['wrap_up_until']);
+	}
+
+	// only the agent's row counts, whatever else mod_callcenter lists
+	public function testReadsTheRowOfTheAgent(): void
+	{
+		\FakeStore::update(function (&$store) {
+			$store['esl_responses'][self::LIST] = CallCenterAgentList::reply(
+				CallCenterAgentList::row(self::ANA_SECOND, 'Available', 'Receiving'),
+				CallCenterAgentList::row(self::ANA, 'On Break', 'Idle')
+			);
+		});
+
+		$result = $this->agentStatus();
+
+		$this->assertSame(array('On Break', 'Idle'), array($result['status'], $result['state']));
+	}
+
+	// FusionPBX loads every agent into mod_callcenter; one it doesn't know is
+	// listed as nothing
+	public function testAnswers500ForAnAgentMissingInFreeswitch(): void
+	{
+		\FakeStore::update(function (&$store) {
+			$store['esl_responses'][self::LIST] = CallCenterAgentList::reply();
+		});
+
+		list($result, $logged) = $this->agentStatusLogged(array());
+
+		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
+		$this->assertStringContainsString(self::ANA.' is not loaded in mod_callcenter', $logged);
 	}
 
 	// reading only needs call_center_agent_view
@@ -110,8 +178,8 @@ class CallCenterAgentStatusTest extends ActionTestCase
 
 		$result = $this->agentStatus(array('status' => 'On Break'));
 
-		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'On Break', 'state' => 'Waiting'), $result);
-		$this->assertSame(array("api callcenter_config agent set status ".self::ANA." 'On Break'", self::GET_STATUS, self::GET_STATE), $this->state()['esl_commands']);
+		$this->assertSame(array('user_uuid' => self::ANA_USER, 'status' => 'On Break', 'state' => 'Waiting', 'wrap_up_until' => null), $result);
+		$this->assertSame(array("api callcenter_config agent set status ".self::ANA." 'On Break'", self::LIST), $this->state()['esl_commands']);
 	}
 
 	// the configuration FreeSWITCH reloads takes the status from the agent's row
@@ -137,8 +205,7 @@ class CallCenterAgentStatusTest extends ActionTestCase
 		$this->assertSame(array(
 			"api callcenter_config agent set status ".self::ANA." '".$status."'",
 			"api callcenter_config agent set state ".self::ANA." 'Waiting'",
-			self::GET_STATUS,
-			self::GET_STATE,
+			self::LIST,
 		), $this->state()['esl_commands']);
 	}
 

@@ -2,11 +2,14 @@
 $required_params = array("user_uuid", "state");
 $required_permissions = array("call_center_agent_view", "call_center_agent_edit");
 
-// sets the call center state of a user's agent, e.g. "Waiting" to end its
-// wrap-up, and returns its live status and state. the state only lives in
-// mod_callcenter: FusionPBX keeps no column for it
+// sets the call center state of a user's agent, e.g. "Waiting", and returns
+// its live status and state. the state only lives in mod_callcenter:
+// FusionPBX keeps no column for it
 function do_action($body) {
-    $states = array("Waiting", "In a queue call", "Receiving a call", "Wrap-up");
+    // the states mod_callcenter knows ("Unknown" can't be set). it has no
+    // wrap-up state: after a call the agent stays Waiting until its wrap-up
+    // time is over
+    $states = array("Waiting", "Receiving", "In a queue call", "Idle", "Reserved");
     if(!is_uuid($body->user_uuid)) {
         return array("error" => "invalid user_uuid", "code" => 400);
     }
