@@ -12,5 +12,5 @@ function do_action($body) {
     if(!$extension) {
         return array("error" => "extension not found", "code" => 404);
     }
-    return $extension;
+    return rest_api_format_extension($extension);
 }

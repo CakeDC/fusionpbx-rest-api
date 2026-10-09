@@ -5,7 +5,7 @@ use RestApi\Test\Support\RestApiTestCase;
 
 /**
  * Requests act on the key user's domain, or on another domain when the user
- * has domain_select (#43940).
+ * has domain_select.
  */
 class RestDomainScopeTest extends RestApiTestCase
 {
@@ -31,7 +31,7 @@ class RestDomainScopeTest extends RestApiTestCase
 
 	private function extensions(array $response): array
 	{
-		return array_column($this->json($response), 'extension');
+		return array_column($this->json($response)['data'], 'extension');
 	}
 
 	public function testActsOnTheUsersDomainByDefault(): void
@@ -90,6 +90,48 @@ class RestDomainScopeTest extends RestApiTestCase
 			$this->assertSame(400, $response['status'], json_encode($domain_uuid));
 			$this->assertSame(array('error' => 'invalid domain_uuid'), $this->json($response));
 		}
+	}
+
+	// domain-list lists other domains only for domain_select, the
+	// same rule rest.php applies to domain_uuid
+	public function testDomainListOnlyListsOtherDomainsWithDomainSelect(): void
+	{
+		$own = $this->api(array('action' => 'domain-list'));
+		$this->allowOtherDomains();
+		$all = $this->api(array('action' => 'domain-list'));
+
+		$this->assertSame(200, $own['status']);
+		$this->assertSame(array('tenant1.example.com'), array_column($this->json($own)['data'], 'domain_name'));
+		$this->assertSame(200, $all['status']);
+		$this->assertSame(array('tenant1.example.com', 'tenant2.example.com'), array_column($this->json($all)['data'], 'domain_name'));
+	}
+
+	// domain_uuid doesn't narrow domain-list, but rest.php still checks it as
+	// for every action before the list is built
+	public function testDomainListChecksAnExplicitDomainUuidLikeEveryAction(): void
+	{
+		$own = $this->api(array('action' => 'domain-list', 'domain_uuid' => self::DOMAIN_UUID));
+		$other = $this->api(array('action' => 'domain-list', 'domain_uuid' => self::OTHER_DOMAIN_UUID));
+		$malformed = $this->api(array('action' => 'domain-list', 'domain_uuid' => 'tenant2'));
+		$this->allowOtherDomains();
+		$missing = $this->api(array('action' => 'domain-list', 'domain_uuid' => self::MISSING_DOMAIN));
+		$all = $this->api(array('action' => 'domain-list', 'domain_uuid' => self::DOMAIN_UUID));
+
+		$this->assertSame(array('tenant1.example.com'), array_column($this->json($own)['data'], 'domain_name'));
+		$this->assertSame(array(403, array('error' => 'forbidden')), array($other['status'], $this->json($other)));
+		$this->assertSame(array(400, array('error' => 'invalid domain_uuid')), array($malformed['status'], $this->json($malformed)));
+		$this->assertSame(array(404, array('error' => 'domain not found')), array($missing['status'], $this->json($missing)));
+		$this->assertSame(array('tenant1.example.com', 'tenant2.example.com'), array_column($this->json($all)['data'], 'domain_name'));
+	}
+
+	public function testDomainListNeedsDomainView(): void
+	{
+		$this->grantOnly(array_values(array_diff(self::ACTION_PERMISSIONS, array('domain_view'))));
+
+		$response = $this->api(array('action' => 'domain-list'));
+
+		$this->assertSame(403, $response['status']);
+		$this->assertSame(array('error' => 'forbidden', 'missing_permissions' => array('domain_view')), $this->json($response));
 	}
 
 	public function testDomainDetailsReturnsTheUsersDomainByDefault(): void

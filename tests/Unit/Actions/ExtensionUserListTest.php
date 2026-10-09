@@ -93,9 +93,18 @@ class ExtensionUserListTest extends ActionTestCase
 		$this->assertSame(array('error' => 'user not found', 'code' => 404), $result);
 	}
 
+	// lower-cased like domain_uuid, as in user-details
+	public function testFindsTheUserByAnUpperCaseUuid(): void
+	{
+		$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => strtoupper(self::AGENT)));
+
+		$this->assertSame(array('101', '102'), array_column($result['data'], 'extension'));
+		$this->assertSame(array(self::AGENT, self::AGENT), array_column($result['data'], 'user_uuid'));
+	}
+
 	public function testRejectsAMalformedUserUuid(): void
 	{
-		foreach (array('not-a-uuid', array(self::AGENT), 42) as $user_uuid) {
+		foreach (array('not-a-uuid', '', array(self::AGENT), 42) as $user_uuid) {
 			$result = $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'user_uuid' => $user_uuid));
 
 			$this->assertSame(array('error' => 'invalid user_uuid', 'code' => 400), $result, json_encode($user_uuid));
@@ -136,7 +145,7 @@ class ExtensionUserListTest extends ActionTestCase
 		$this->assertSame(array('error' => 'database error', 'code' => 500), $result);
 	}
 
-	// the contract's enabled is a boolean, whether the column is text or boolean
+	// enabled is a boolean in the response, whether the column is text or boolean
 	public function testReturnsEnabledAsABoolean(): void
 	{
 		foreach (array(array('true', true), array('false', false), array('t', true), array('f', false), array(true, true), array(false, false), array(null, false)) as list($stored, $enabled)) {

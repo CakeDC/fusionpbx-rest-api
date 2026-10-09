@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Every action declares the FusionPBX permissions rest.php checks before running
- * it (#43940). FusionPBX's save() silently skips tables the user can't add to,
+ * it. FusionPBX's save() silently skips tables the user can't add to,
  * so the list must cover every table the action saves.
  */
 #[RunTestsInSeparateProcesses]
@@ -18,14 +18,30 @@ class ActionDeclarationsTest extends TestCase
 		'cdr-list' => array('xml_cdr_view'),
 		'cdr-search' => array('xml_cdr_view'),
 		'destination-create' => array('destination_add', 'dialplan_add', 'dialplan_detail_add'),
+		'destination-delete' => array('destination_delete', 'dialplan_delete', 'dialplan_detail_delete'),
 		'destination-details' => array('destination_view'),
+		'destination-list' => array('destination_view'),
+		'destination-update' => array('destination_edit', 'dialplan_edit', 'dialplan_detail_add', 'dialplan_detail_delete'),
 		'domain-details' => array(),
+		'domain-list' => array('domain_view'),
 		'extension-create' => array('extension_add', 'voicemail_add'),
+		'extension-delete' => array(
+			'extension_delete', 'extension_user_delete', 'follow_me_delete', 'follow_me_destination_delete',
+			'ring_group_destination_delete', 'extension_setting_delete', 'voicemail_delete',
+			'voicemail_option_delete', 'voicemail_message_delete', 'voicemail_destination_delete',
+			'voicemail_greeting_delete',
+		),
 		'extension-details' => array('extension_view'),
 		'extension-list' => array('extension_view'),
+		'extension-update' => array('extension_edit'),
 		'extension-user-list' => array('extension_view', 'user_view'),
 		'originate' => array('click_to_call_call'),
 		'ringgroup-create' => array('ring_group_add', 'ring_group_destination_add', 'dialplan_add'),
+		'ringgroup-details' => array('ring_group_view', 'ring_group_destination_view'),
+		'ringgroup-list' => array('ring_group_view', 'ring_group_destination_view'),
+		'ringgroup-update' => array('ring_group_edit'),
+		'user-details' => array('user_view'),
+		'user-list' => array('user_view'),
 	);
 
 	public static function actions(): array

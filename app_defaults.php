@@ -2,7 +2,7 @@
 // run by Advanced -> Upgrade -> App Defaults, once per domain. the index is
 // for the whole table, so only the first domain builds it
 if (isset($domains_processed, $database) && $domains_processed == 1 && $database->type == 'pgsql') {
-    // cdr-search and cdr-details look legs up by originating_leg_uuid (#43937),
+    // cdr-search and cdr-details look legs up by originating_leg_uuid,
     // which FusionPBX doesn't index. CONCURRENTLY doesn't block CDR inserts
     // while it builds on a large table
     $sql = "SELECT i.indisvalid FROM pg_class c JOIN pg_index i ON i.indexrelid = c.oid WHERE c.relname = :name";
