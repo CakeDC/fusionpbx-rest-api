@@ -108,6 +108,34 @@ class InputValidationTest extends TestCase
 		}
 	}
 
+	// caller ID names end up in the directory and SIP headers: one line of text
+	public function testIsCallerIdNameAcceptsOneLineOfText(): void
+	{
+		foreach (array('Ana Ruiz', '', 'Recepción', str_repeat('a', 255)) as $value) {
+			$this->assertTrue(rest_api_is_caller_id_name($value), json_encode($value));
+		}
+		foreach (array(42, null, array('Ana'), "Ana\nRuiz", "Ana\x00", str_repeat('a', 256)) as $value) {
+			$this->assertFalse(rest_api_is_caller_id_name($value), json_encode($value));
+		}
+	}
+
+	// page and per_page of every paginated action (cdr-search, domain-list, user-list)
+	public function testParsePaginationDefaultsAndAcceptsDigitStrings(): void
+	{
+		$this->assertSame(array(1, 25), rest_api_parse_pagination((object)array()));
+		$this->assertSame(array(1000000, 200), rest_api_parse_pagination((object)array('page' => '1000000', 'per_page' => 200)));
+	}
+
+	public function testParsePaginationRejectsInvalidValues(): void
+	{
+		foreach (array(0, '1.5', 1000001, 2.0) as $page) {
+			$this->assertSame(array('error' => 'invalid page', 'code' => 400), rest_api_parse_pagination((object)array('page' => $page)), json_encode($page));
+		}
+		foreach (array(0, 201, 'all') as $per_page) {
+			$this->assertSame(array('error' => 'invalid per_page', 'code' => 400), rest_api_parse_pagination((object)array('per_page' => $per_page)), json_encode($per_page));
+		}
+	}
+
 	public static function timestamps(): array
 	{
 		return array(

@@ -12,10 +12,19 @@ function do_action($body, $context = array()) {
         $parameters['domain_uuid'] = $body->domain_uuid;
     }
     $database = new database;
-    $extension = $database->select($sql, $parameters, 'row');
-    if(!$extension) {
+    // FusionPBX's select() returns false on a database error
+    $destinations = $database->select($sql, $parameters, 'all');
+    if(!is_array($destinations)) {
+        return array("error" => "database error", "code" => 500);
+    }
+    if(!$destinations) {
         return array("error" => "no such destination", "code" => 404);
     }
+    // FusionPBX allows the same number twice (another context or prefix, or
+    // another domain): which row is meant can't be told from the number
+    if(count($destinations) > 1) {
+        return array("error" => "ambiguous destination", "code" => 409);
+    }
 
-    return rest_api_decode_destination($extension);
+    return rest_api_decode_destination($destinations[0]);
 }

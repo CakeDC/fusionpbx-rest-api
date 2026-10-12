@@ -90,6 +90,110 @@ class FakesTest extends TestCase
 		$this->assertSame(array('voicemails'), $state['skipped']);
 	}
 
+	// 5.6.5's save() updates a record whose <singular>_uuid exists, only with
+	// <singular>_edit, and changes only the fields it is given
+	public function testSaveUpdatesAnExistingRecordWithTheEditPermission(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_extensions'] = array(
+				array('extension_uuid' => 'e1', 'extension' => '100', 'enabled' => 'true'),
+				array('extension_uuid' => 'e2', 'extension' => '200', 'enabled' => 'true'),
+			);
+		});
+		$_SESSION['permissions'] = array('extension_edit' => true);
+		$database = \database::new(array('user_uuid' => self::USER));
+
+		$saved = $database->save(array('extensions' => array(array('extension_uuid' => 'e1', 'enabled' => 'false'))));
+
+		$this->assertTrue($saved);
+		$this->assertSame(array(
+			array('extension_uuid' => 'e1', 'extension' => '100', 'enabled' => 'false', 'update_user' => self::USER),
+			array('extension_uuid' => 'e2', 'extension' => '200', 'enabled' => 'true'),
+		), FakeStore::read()['tables']['v_extensions']);
+	}
+
+	public function testSaveSkipsAnUpdateWithoutTheEditPermission(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_extensions'] = array(array('extension_uuid' => 'e1', 'enabled' => 'true'));
+		});
+		$_SESSION['permissions'] = array('extension_add' => true);
+
+		$this->assertTrue((new \database)->save(array('extensions' => array(array('extension_uuid' => 'e1', 'enabled' => 'false')))));
+
+		$state = FakeStore::read();
+		$this->assertSame(array(array('extension_uuid' => 'e1', 'enabled' => 'true')), $state['tables']['v_extensions']);
+		$this->assertSame(array('extensions'), $state['skipped']);
+	}
+
+	// 5.6.5's delete() removes the rows matching every given field, only with
+	// <singular>_delete; without it nothing happens and it still returns true
+	public function testDeleteRemovesMatchingRowsWithTheDeletePermission(): void
+	{
+		$links = array(
+			array('extension_user_uuid' => 'l1', 'extension_uuid' => 'e1', 'user_uuid' => 'u1'),
+			array('extension_user_uuid' => 'l2', 'extension_uuid' => 'e1', 'user_uuid' => 'u2'),
+			array('extension_user_uuid' => 'l3', 'extension_uuid' => 'e2', 'user_uuid' => 'u1'),
+		);
+		FakeStore::update(function (&$state) use ($links) {
+			$state['tables']['v_extension_users'] = $links;
+		});
+		$_SESSION['permissions'] = array('extension_user_delete' => true);
+
+		$this->assertTrue((new \database)->delete(array('extension_users' => array(array('extension_uuid' => 'e1')))));
+
+		$this->assertSame(array($links[2]), FakeStore::read()['tables']['v_extension_users']);
+	}
+
+	public function testDeleteSkipsTablesWithoutTheDeletePermission(): void
+	{
+		$links = array(array('extension_user_uuid' => 'l1', 'extension_uuid' => 'e1'));
+		FakeStore::update(function (&$state) use ($links) {
+			$state['tables']['v_extension_users'] = $links;
+		});
+		$_SESSION['permissions'] = array('extension_user_add' => true);
+
+		$this->assertTrue((new \database)->delete(array('extension_users' => array(array('extension_uuid' => 'e1')))));
+
+		$state = FakeStore::read();
+		$this->assertSame($links, $state['tables']['v_extension_users']);
+		$this->assertSame(array('extension_users'), $state['skipped']);
+	}
+
+	// 5.6.5's delete() catches the PDOException and returns false
+	public function testDeleteReturnsFalseWhenTheDatabaseFails(): void
+	{
+		$links = array(array('extension_user_uuid' => 'l1', 'extension_uuid' => 'e1'));
+		FakeStore::update(function (&$state) use ($links) {
+			$state['tables']['v_extension_users'] = $links;
+			$state['delete_fails'] = true;
+		});
+		$_SESSION['permissions'] = array('extension_user_delete' => true);
+
+		$this->assertFalse((new \database)->delete(array('extension_users' => array(array('extension_uuid' => 'e1')))));
+		$this->assertSame($links, FakeStore::read()['tables']['v_extension_users']);
+	}
+
+	// FusionPBX's settings: default settings by category and subcategory
+	public function testSettingsReturnTheStoredValueOrTheDefault(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['settings']['switch']['voicemail'] = '/var/lib/freeswitch/storage/voicemail';
+		});
+		$settings = new \settings(array('domain_uuid' => self::DOMAIN));
+
+		$this->assertSame('/var/lib/freeswitch/storage/voicemail', $settings->get('switch', 'voicemail'));
+		$this->assertSame('file', $settings->get('cache', 'method', 'file'));
+	}
+
+	// FusionPBX caches the directory entry of each extension (directory:<ext>@<context>)
+	public function testCacheDeleteIsRecorded(): void
+	{
+		(new \cache)->delete('directory:100@tenant1.example.com');
+
+		$this->assertSame(array('directory:100@tenant1.example.com'), FakeStore::read()['cache_deleted']);
+	}
+
 	public function testNewDatabaseTakesTheUserFromTheSession(): void
 	{
 		$_SESSION['user_uuid'] = self::USER;

@@ -16,7 +16,7 @@ class ExtensionDetailsTest extends ActionTestCase
 	{
 		return parent::tables() + array(
 			'v_extensions' => array(
-				array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '100', 'password' => 'sip-secret', 'effective_caller_id_name' => 'Front Desk'),
+				array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '100', 'password' => 'sip-secret', 'effective_caller_id_name' => 'Front Desk', 'enabled' => 'true'),
 			),
 		);
 	}
@@ -28,6 +28,8 @@ class ExtensionDetailsTest extends ActionTestCase
 		$this->assertSame('100', $result['extension']);
 		$this->assertSame('Front Desk', $result['effective_caller_id_name']);
 		$this->assertArrayNotHasKey('password', $result);
+		// a boolean, as extension-list returns it, whatever the column type
+		$this->assertTrue($result['enabled']);
 	}
 
 	public function testDoesNotReturnAnExtensionFromAnotherDomain(): void

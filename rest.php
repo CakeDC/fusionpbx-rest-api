@@ -150,5 +150,8 @@ if(function_exists('do_action')) {
 		http_response_code(500);
 	}
 
-	echo json_encode($resp);
+	// a 204 has no body
+	if(http_response_code() !== 204) {
+		echo json_encode($resp);
+	}
 }

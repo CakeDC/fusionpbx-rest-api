@@ -2,7 +2,7 @@
 namespace RestApi\Test\Support;
 
 /**
- * v_xml_cdr rows shaped like FusionPBX 5.6.5 writes them (#43937). Legs are
+ * v_xml_cdr rows shaped like FusionPBX 5.6.5 writes them. Legs are
  * linked as FusionPBX does: an "a" leg's bridge_uuid is the xml_cdr_uuid of
  * the "b" leg it was bridged to, a "b" leg's originating_leg_uuid is the
  * xml_cdr_uuid of its "a" leg. Calls of tenant1, newest first:

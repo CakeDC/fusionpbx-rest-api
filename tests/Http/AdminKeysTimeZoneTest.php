@@ -5,7 +5,7 @@ use RestApi\Test\Support\AdminKeysHelpers;
 use RestApi\Test\Support\RestApiTestCase;
 
 /**
- * key_edit.php with PHP in a non-UTC time zone: the stored expiry must keep its instant (#43940).
+ * key_edit.php with PHP in a non-UTC time zone: the stored expiry must keep its instant.
  */
 class AdminKeysTimeZoneTest extends RestApiTestCase
 {

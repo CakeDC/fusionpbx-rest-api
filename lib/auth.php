@@ -1,5 +1,5 @@
 <?php
-// API keys act as the FusionPBX user they are bound to (#43940)
+// API keys act as the FusionPBX user they are bound to
 
 // PostgreSQL booleans reach PHP as true/false or "t"/"f"; FusionPBX writes "true"/"false"
 function rest_api_is_true($value) {

@@ -4,7 +4,7 @@ namespace RestApi\Test\Http;
 use RestApi\Test\Support\RestApiTestCase;
 
 /**
- * Actions run with the FusionPBX permissions of the key's user (#43940).
+ * Actions run with the FusionPBX permissions of the key's user.
  */
 class RestPermissionsTest extends RestApiTestCase
 {
@@ -24,7 +24,7 @@ class RestPermissionsTest extends RestApiTestCase
 	{
 		$response = $this->api(array('action' => 'extension-create', 'domain_uuid' => self::DOMAIN_UUID, 'extension' => '150'));
 
-		$this->assertSame(200, $response['status']);
+		$this->assertSame(201, $response['status']);
 		$this->assertSame(array(), $this->state()['skipped']);
 		$this->assertCount(1, $this->state()['tables']['v_voicemails']);
 	}
@@ -40,7 +40,7 @@ class RestPermissionsTest extends RestApiTestCase
 		$this->assertArrayNotHasKey('v_extensions', $this->state()['tables']);
 	}
 
-	// listing a user's extensions also tells whether the user exists (#43936)
+	// listing a user's extensions also tells whether the user exists
 	public function testListingAUsersExtensionsNeedsUserView(): void
 	{
 		$this->grantOnly(array('extension_view'));

@@ -37,7 +37,7 @@ class CdrSearchTest extends ActionTestCase
 		$this->assertSame(array('page' => 1, 'per_page' => 25, 'total' => 7), $result['pagination']);
 	}
 
-	public function testReturnsTheContractFieldsWithTheirTypes(): void
+	public function testReturnsTheDocumentedFieldsWithTheirTypes(): void
 	{
 		$a1 = $this->search()['data'][6];
 
@@ -287,8 +287,7 @@ class CdrSearchTest extends ActionTestCase
 	}
 
 	// with calls_only, a call matches extension_uuid only through the legs
-	// cdr-details returns for it, or ZuluCall would list a call whose legs
-	// don't include the viewer's extension
+	// cdr-details returns for it
 	#[DataProvider('legsOfOtherCalls')]
 	public function testMatchesExtensionsOnlyThroughTheLegsOfTheCall(string $uuid, string $column, string $value, string $extension, array $expected): void
 	{

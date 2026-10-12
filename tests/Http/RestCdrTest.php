@@ -4,7 +4,7 @@ namespace RestApi\Test\Http;
 use RestApi\Test\Support\CdrSample;
 use RestApi\Test\Support\RestApiTestCase;
 
-/** cdr-search and cdr-details through rest.php: the HTTP status is really sent (#43937). */
+/** cdr-search and cdr-details through rest.php: the HTTP status is really sent. */
 class RestCdrTest extends RestApiTestCase
 {
 	protected function tables(): array

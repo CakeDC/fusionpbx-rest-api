@@ -69,7 +69,7 @@ echo "</div>\n";
 echo "<br /><br />\n";
 echo "endpoint: <code>https://".escape($_SERVER['HTTP_HOST'])."/app/rest_api/rest.php</code>\n";
 
-// keys without a user (from before #43940, or whose user was deleted) can't authenticate
+// keys without a user (from before keys were bound to users, or whose user was deleted) can't authenticate
 $sql = "SELECT k.key_uuid, k.name, k.key_enabled, k.expires, k.created, k.last_used, u.username, d.domain_name";
 $sql .= " FROM rest_api_keys k LEFT JOIN v_users u ON u.user_uuid = k.user_uuid LEFT JOIN v_domains d ON d.domain_uuid = u.domain_uuid";
 $sql .= " ORDER BY k.last_used DESC";

@@ -58,7 +58,7 @@ if(!empty($_POST)) {
     $key_enabled = posted('key_enabled') === 'true';
     $expires = posted('expires');
 
-    // the key acts as this user, so it must exist (#43940)
+    // the key acts as this user, so it must exist
     $sql = "SELECT user_uuid FROM v_users WHERE user_uuid = :user_uuid";
     if(!is_uuid($user_uuid) || !$database->select($sql, array('user_uuid' => $user_uuid), 'column')) {
         $error = "select the user this key acts as";

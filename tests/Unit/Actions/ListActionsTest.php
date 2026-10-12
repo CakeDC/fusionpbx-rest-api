@@ -5,12 +5,12 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
 /**
- * Read-only lookups: extension-list, cdr-list, domain-details, destination-details.
+ * Read-only lookups: cdr-list, domain-details, destination-details.
  */
 #[RunTestsInSeparateProcesses]
 class ListActionsTest extends ActionTestCase
 {
-	private string $action = 'extension-list';
+	private string $action = 'cdr-list';
 
 	protected function action(): string
 	{
@@ -31,10 +31,6 @@ class ListActionsTest extends ActionTestCase
 	protected function tables(): array
 	{
 		return parent::tables() + array(
-			'v_extensions' => array(
-				array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '100', 'emergency_caller_id_number' => '5551000', 'password' => 'sip-secret'),
-				array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000200', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002', 'extension' => '200', 'emergency_caller_id_number' => '5552000', 'password' => 'sip-secret'),
-			),
 			'v_xml_cdr' => array(
 				array('xml_cdr_uuid' => 'cdr-1', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'end_stamp' => '2026-10-01 10:00:00', 'destination_number' => '100'),
 				array('xml_cdr_uuid' => 'cdr-2', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'end_stamp' => '2026-10-02 10:00:00', 'destination_number' => '101'),
@@ -44,16 +40,6 @@ class ListActionsTest extends ActionTestCase
 				array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000001', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'destination_number' => '5551234', 'destination_actions' => '[{"destination_app":"transfer","destination_data":"100 XML tenant1.example.com"}]'),
 				array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000002', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002', 'destination_number' => '5552000', 'destination_actions' => null),
 			),
-		);
-	}
-
-	public function testExtensionListOnlyReturnsTheDomainsExtensions(): void
-	{
-		$this->load('extension-list');
-
-		$this->assertSame(
-			array(array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100', 'extension' => '100', 'emergency_caller_id_number' => '5551000')),
-			$this->runAction(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001'))
 		);
 	}
 
@@ -155,6 +141,39 @@ class ListActionsTest extends ActionTestCase
 		$this->load('destination-details');
 
 		$this->assertSame(404, $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5550000'))['code']);
+	}
+
+	// FusionPBX allows the same number twice, with another context or prefix:
+	// the number doesn't say which row is meant
+	public function testDestinationDetailsAnswersConflictWhenTheNumberIsTheDestinationOfSeveralRows(): void
+	{
+		$this->load('destination-details');
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_destinations'][] = array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000004', 'domain_uuid' => self::DOMAIN_UUID, 'destination_number' => '5551234', 'destination_prefix' => '1', 'destination_actions' => null);
+		});
+
+		$this->assertSame(array('error' => 'ambiguous destination', 'code' => 409), $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234')));
+	}
+
+	// the same number in two domains, searched without a domain
+	public function testDestinationDetailsAnswersConflictWhenSeveralDomainsHaveTheNumber(): void
+	{
+		$this->load('destination-details');
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_destinations'][] = array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000005', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002', 'destination_number' => '5551234', 'destination_actions' => null);
+		});
+		$lookup = array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234');
+
+		$this->assertSame(409, $this->runAction($lookup, array('domain_explicit' => false, 'cross_domain' => true))['code']);
+		$this->assertSame('bbbbbbbb-0000-4000-8000-000000000001', $this->runAction($lookup)['destination_uuid']);
+	}
+
+	public function testDestinationDetailsAnswers500WhenTheDatabaseFails(): void
+	{
+		$this->load('destination-details');
+		$this->failSelects();
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234')));
 	}
 
 	public function testDomainDetailsReturnsOnlyTheDomainColumns(): void

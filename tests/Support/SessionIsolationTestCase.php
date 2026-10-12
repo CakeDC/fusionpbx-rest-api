@@ -3,7 +3,7 @@ namespace RestApi\Test\Support;
 
 /**
  * API requests that carry a logged-in user's FusionPBX session cookie must not
- * see or change that session (#43939 item 8). Subclasses run this against the
+ * see or change that session. Subclasses run this against the
  * different ways FusionPBX may start the session.
  */
 abstract class SessionIsolationTestCase extends RestApiTestCase
