@@ -210,6 +210,20 @@ class DestinationUpdateTest extends ActionTestCase
 		$this->assertSame(array(), $this->state()['saved']);
 	}
 
+	// FusionPBX allows the same inbound number twice in a domain, with another
+	// context or prefix: the number doesn't say which row to change
+	public function testAnswersConflictWhenTheNumberIsTheDestinationOfSeveralRows(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_destinations'][] = array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000004', 'dialplan_uuid' => 'cccccccc-0000-4000-8000-000000000004', 'domain_uuid' => self::DOMAIN_UUID, 'destination_type' => 'inbound', 'destination_number' => '5551234', 'destination_prefix' => '1', 'destination_context' => 'other', 'destination_actions' => null, 'destination_enabled' => 'true');
+		});
+		$before = $this->state()['tables'];
+
+		$this->assertSame(array('error' => 'ambiguous destination', 'code' => 409), $this->update(array('enabled' => false)));
+		$this->assertSame(array(), $this->state()['saved']);
+		$this->assertSame($before, $this->state()['tables']);
+	}
+
 	public static function missingTargets(): array
 	{
 		return array(

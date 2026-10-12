@@ -137,7 +137,7 @@ Creates a new destination in FusionPBX.
 | `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
 | `number`      | yes | Inbound number of the destination to delete |
 
-Delete an inbound destination with its dialplan and dialplan details, as FusionPBX's destinations page does, and clear the dialplan cache of its context. Answers `204` with no body. A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, and an invalid number returns `400 {"error": "invalid number"}`.
+Delete an inbound destination with its dialplan and dialplan details, as FusionPBX's destinations page does, and clear the dialplan cache of its context. Answers `204` with no body. A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, and an invalid number returns `400 {"error": "invalid number"}`. FusionPBX allows the same inbound number more than once in a domain (with another context or prefix); the number then doesn't say which one is meant, and the request is refused with `409 {"error": "ambiguous destination"}` without deleting anything.
 
 ## `destination-details`
 | Parameter     | Required | Description |
@@ -145,7 +145,7 @@ Delete an inbound destination with its dialplan and dialplan details, as FusionP
 | `number`      | yes      | Inbound number to look up |
 | `domain_uuid` | no | Domain to search. Defaults to the key user's domain; users with `domain_select` who leave it out search every domain |
 
-looks up details for a particular destination
+looks up details for a particular destination. A number that isn't a destination returns `404 {"error": "no such destination"}`. FusionPBX allows the same number more than once (with another context or prefix, or in several domains when searching every domain); the number then doesn't say which one is meant, and the lookup returns `409 {"error": "ambiguous destination"}`. Pass `domain_uuid` to narrow a search of every domain, or use `destination-list` to see the rows.
 
 ## `destination-list`
 | Parameter     | Required | Description |
@@ -180,7 +180,7 @@ Update an inbound destination and return it as `destination-list` does. Fields l
 
 A new target replaces the destination's actions with one transfer to it (`<number> XML <context>`, `*99<box>` for voicemail): in the destination, in its dialplan's XML and in its dialplan details. Everything else FusionPBX put in the dialplan (recording, hold music, caller ID prefix, conditions...) stays as it is. If the dialplan no longer contains the destination's actions, because it was edited by hand, the update is refused with `409`. `enabled` switches both the destination and its dialplan. The dialplan cache is cleared as FusionPBX's destination page does.
 
-A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, a target outside the domain returns `404 {"error": "target not found"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
+A number that isn't an inbound destination of the domain returns `404 {"error": "destination not found"}`, a number that is the inbound destination of several rows of the domain (FusionPBX allows it with another context or prefix) returns `409 {"error": "ambiguous destination"}` without changing anything, a target outside the domain returns `404 {"error": "target not found"}`, and an invalid value returns `400 {"error": "invalid <parameter>"}`.
 
 ## `domain-details`
 
@@ -276,7 +276,7 @@ A user without extensions returns `{"data": []}`. A user that is not in the doma
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 | `user_uuid`   | yes | FusionPBX user to look up |
 
-Return one FusionPBX user, to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`. Without `user_uuid` the request is refused before the action runs, with `400 {"error": {"error": "missing required parameter(s)", "missing_parameters": ["user_uuid"]}}` like every action's missing parameters. The uuid may be in upper or lower case.
+Return one FusionPBX user, to check that a stored `domain_uuid` + `user_uuid` pair still resolves to a user: `user_uuid`, `domain_uuid`, `username`, `user_email` (as stored in FusionPBX, `null` when the user has none) and `user_enabled` (boolean). A disabled user is returned with `user_enabled: false`. A user that doesn't exist or belongs to another domain returns `404 {"error": "user not found"}`, and a malformed `user_uuid` returns `400 {"error": "invalid user_uuid"}`. Without `user_uuid` the request is refused before the action runs, with `400 {"error": {"error": "missing required parameter(s)", "missing_parameters": ["user_uuid"]}}` like every action's missing parameters. The uuid may be in upper or lower case.
 
 ## `user-list`
 | Parameter     | Required | Description |
@@ -285,7 +285,7 @@ Return one FusionPBX user, to check that a stored `domain_uuid` + `user_uuid` pa
 | `page`        | no | Page number, from 1 (default 1, at most 1000000) |
 | `per_page`    | no | Rows per page, 1 to 200 (default 25) |
 
-List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `user_uuid`, `domain_uuid`, `username` and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
+List the FusionPBX users of a domain, disabled ones included, sorted by username: `{"data": [...], "pagination": {"page": 1, "per_page": 25, "total": 3}}`. Each item has `user_uuid`, `domain_uuid`, `username`, `user_email` (as stored in FusionPBX, `null` when the user has none) and `user_enabled` (boolean); passwords and API keys are never returned. A page past the last returns `"data": []` with the correct `total`, and an invalid `page` or `per_page` returns `400 {"error": "invalid <parameter>"}`.
 
 ## `ringgroup-create`
 | Parameter      | Required | Description |

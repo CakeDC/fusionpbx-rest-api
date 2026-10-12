@@ -98,6 +98,20 @@ class DestinationDeleteTest extends ActionTestCase
 		$this->assertCount(4, $this->state()['tables']['v_destinations']);
 	}
 
+	// FusionPBX allows the same inbound number twice in a domain, with another
+	// context or prefix: the number doesn't say which row to delete
+	public function testAnswersConflictWhenTheNumberIsTheDestinationOfSeveralRows(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_destinations'][] = array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000004', 'dialplan_uuid' => 'cccccccc-0000-4000-8000-000000000004', 'domain_uuid' => self::DOMAIN_UUID, 'destination_type' => 'inbound', 'destination_number' => '5551234', 'destination_context' => 'other');
+		});
+
+		$this->assertSame(array('error' => 'ambiguous destination', 'code' => 409), $this->delete());
+		$this->assertCount(5, $this->state()['tables']['v_destinations']);
+		$this->assertCount(3, $this->state()['tables']['v_dialplans']);
+		$this->assertSame(array(), $this->state()['cache_deleted']);
+	}
+
 	// the other domain's 5551234 stays
 	public function testOnlyDeletesTheDestinationOfTheRequestedDomain(): void
 	{

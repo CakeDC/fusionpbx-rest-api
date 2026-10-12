@@ -171,6 +171,7 @@ const REST_API_USER_FIELDS = array(
     "user_uuid",
     "domain_uuid",
     "username",
+    "user_email",
     "user_enabled"
 );
 
@@ -381,6 +382,8 @@ function rest_api_format_domain($domain) {
 
 // user_enabled is boolean on Postgres, text on sqlite and mysql
 function rest_api_format_user($user) {
+    // as stored; FusionPBX leaves it empty or NULL for a user without one
+    $user['user_email'] = isset($user['user_email']) && $user['user_email'] !== '' ? $user['user_email'] : null;
     $user['user_enabled'] = in_array($user['user_enabled'], array(true, 1, "1", "t", "true"), true);
     return $user;
 }

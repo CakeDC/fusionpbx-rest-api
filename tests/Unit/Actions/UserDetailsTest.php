@@ -23,12 +23,12 @@ class UserDetailsTest extends ActionTestCase
 
 	protected function tables(): array
 	{
-		$secrets = array('password' => '$2y$10$hash', 'salt' => 'pepper', 'api_key' => 'fusionpbx-api-key', 'user_email' => 'someone@example.com');
+		$secrets = array('password' => '$2y$10$hash', 'salt' => 'pepper', 'api_key' => 'fusionpbx-api-key', 'user_totp_secret' => 'totp');
 		return parent::tables() + array(
 			'v_users' => array(
-				array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_enabled' => 'true') + $secrets,
-				array('user_uuid' => self::FORMER, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'former', 'user_enabled' => 'false') + $secrets,
-				array('user_uuid' => self::OTHER_DOMAIN_USER, 'domain_uuid' => self::OTHER_DOMAIN_UUID, 'username' => 'agent', 'user_enabled' => 'true') + $secrets,
+				array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_email' => 'agent@example.com', 'user_enabled' => 'true') + $secrets,
+				array('user_uuid' => self::FORMER, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'former', 'user_email' => null, 'user_enabled' => 'false') + $secrets,
+				array('user_uuid' => self::OTHER_DOMAIN_USER, 'domain_uuid' => self::OTHER_DOMAIN_UUID, 'username' => 'agent', 'user_email' => 'agent@example.com', 'user_enabled' => 'true') + $secrets,
 			),
 		);
 	}
@@ -41,9 +41,21 @@ class UserDetailsTest extends ActionTestCase
 	public function testReturnsTheUser(): void
 	{
 		$this->assertSame(
-			array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_enabled' => true),
+			array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_email' => 'agent@example.com', 'user_enabled' => true),
 			$this->details(self::AGENT)
 		);
+	}
+
+	// FusionPBX leaves the email NULL or empty for a user without one
+	public function testReturnsNullForAUserWithoutEmail(): void
+	{
+		$this->assertNull($this->details(self::FORMER)['user_email']);
+
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_users'][1]['user_email'] = '';
+		});
+
+		$this->assertNull($this->details(self::FORMER)['user_email']);
 	}
 
 	// a disabled user is still found: the caller decides what to do with it

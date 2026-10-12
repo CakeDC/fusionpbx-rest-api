@@ -24,13 +24,13 @@ class UserListTest extends ActionTestCase
 
 	protected function tables(): array
 	{
-		$secrets = array('password' => '$2y$10$hash', 'salt' => 'pepper', 'api_key' => 'fusionpbx-api-key', 'user_email' => 'someone@example.com');
+		$secrets = array('password' => '$2y$10$hash', 'salt' => 'pepper', 'api_key' => 'fusionpbx-api-key', 'user_totp_secret' => 'totp');
 		return parent::tables() + array(
 			'v_users' => array(
-				array('user_uuid' => self::FORMER, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'former', 'user_enabled' => 'false') + $secrets,
-				array('user_uuid' => self::ADMIN, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'admin', 'user_enabled' => 'true') + $secrets,
-				array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_enabled' => 'true') + $secrets,
-				array('user_uuid' => self::OTHER_DOMAIN_USER, 'domain_uuid' => self::OTHER_DOMAIN_UUID, 'username' => 'agent', 'user_enabled' => 'true') + $secrets,
+				array('user_uuid' => self::FORMER, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'former', 'user_email' => null, 'user_enabled' => 'false') + $secrets,
+				array('user_uuid' => self::ADMIN, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'admin', 'user_email' => '', 'user_enabled' => 'true') + $secrets,
+				array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_email' => 'agent@example.com', 'user_enabled' => 'true') + $secrets,
+				array('user_uuid' => self::OTHER_DOMAIN_USER, 'domain_uuid' => self::OTHER_DOMAIN_UUID, 'username' => 'agent', 'user_email' => 'agent@example.com', 'user_enabled' => 'true') + $secrets,
 			),
 		);
 	}
@@ -45,9 +45,9 @@ class UserListTest extends ActionTestCase
 	{
 		$this->assertSame(array(
 			'data' => array(
-				array('user_uuid' => self::ADMIN, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'admin', 'user_enabled' => true),
-				array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_enabled' => true),
-				array('user_uuid' => self::FORMER, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'former', 'user_enabled' => false),
+				array('user_uuid' => self::ADMIN, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'admin', 'user_email' => null, 'user_enabled' => true),
+				array('user_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'agent', 'user_email' => 'agent@example.com', 'user_enabled' => true),
+				array('user_uuid' => self::FORMER, 'domain_uuid' => self::DOMAIN_UUID, 'username' => 'former', 'user_email' => null, 'user_enabled' => false),
 			),
 			'pagination' => array('page' => 1, 'per_page' => 25, 'total' => 3),
 		), $this->list());

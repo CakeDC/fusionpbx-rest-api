@@ -46,6 +46,11 @@ function do_action($body) {
     if(!$destinations) {
         return array("error" => "destination not found", "code" => 404);
     }
+    // FusionPBX allows the same inbound number twice in a domain (another
+    // context or prefix): which row is meant can't be told from the number
+    if(count($destinations) > 1) {
+        return array("error" => "ambiguous destination", "code" => 409);
+    }
     $destination = $destinations[0];
 
     $sql = "SELECT dialplan_xml FROM v_dialplans WHERE dialplan_uuid = :dialplan_uuid AND domain_uuid = :domain_uuid";

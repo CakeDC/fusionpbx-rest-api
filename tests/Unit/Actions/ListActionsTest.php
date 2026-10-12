@@ -143,6 +143,39 @@ class ListActionsTest extends ActionTestCase
 		$this->assertSame(404, $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5550000'))['code']);
 	}
 
+	// FusionPBX allows the same number twice, with another context or prefix:
+	// the number doesn't say which row is meant
+	public function testDestinationDetailsAnswersConflictWhenTheNumberIsTheDestinationOfSeveralRows(): void
+	{
+		$this->load('destination-details');
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_destinations'][] = array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000004', 'domain_uuid' => self::DOMAIN_UUID, 'destination_number' => '5551234', 'destination_prefix' => '1', 'destination_actions' => null);
+		});
+
+		$this->assertSame(array('error' => 'ambiguous destination', 'code' => 409), $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234')));
+	}
+
+	// the same number in two domains, searched without a domain
+	public function testDestinationDetailsAnswersConflictWhenSeveralDomainsHaveTheNumber(): void
+	{
+		$this->load('destination-details');
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_destinations'][] = array('destination_uuid' => 'bbbbbbbb-0000-4000-8000-000000000005', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002', 'destination_number' => '5551234', 'destination_actions' => null);
+		});
+		$lookup = array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234');
+
+		$this->assertSame(409, $this->runAction($lookup, array('domain_explicit' => false, 'cross_domain' => true))['code']);
+		$this->assertSame('bbbbbbbb-0000-4000-8000-000000000001', $this->runAction($lookup)['destination_uuid']);
+	}
+
+	public function testDestinationDetailsAnswers500WhenTheDatabaseFails(): void
+	{
+		$this->load('destination-details');
+		$this->failSelects();
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'number' => '5551234')));
+	}
+
 	public function testDomainDetailsReturnsOnlyTheDomainColumns(): void
 	{
 		$this->load('domain-details');
