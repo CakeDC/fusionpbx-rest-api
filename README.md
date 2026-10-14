@@ -6,16 +6,31 @@ Clone a release into FusionPBX's `app/` folder, into a folder called `rest_api`:
 
 ```
 cd /var/www/fusionpbx/app
-git clone --branch 1.0.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
+git clone --branch 2.0.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
 ```
 
 Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, App Defaults, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions. App Defaults adds the index on `v_xml_cdr.originating_leg_uuid` that `cdr-search` and `cdr-details` need on PostgreSQL; on a large CDR table it can take a few minutes, without blocking new call records.)
 
-To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout v<version>`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) first.
+To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout <version>`, e.g. `2.0.0`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) and the [changelog](CHANGELOG.md) first.
 
 # Compatibility
 
-Version 1.0.0 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases).
+Version 2.0.0 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases), and what changed in each one in the [changelog](CHANGELOG.md).
+
+# Features
+
+| Area | Actions |
+|---|---|
+| Domains and users | `domain-details`, `domain-list`, `user-details`, `user-list` |
+| Extensions | `extension-create`, `extension-details`, `extension-list`, `extension-update`, `extension-delete`, `extension-user-list` |
+| Inbound destinations | `destination-create`, `destination-details`, `destination-list`, `destination-update`, `destination-delete` |
+| Ring groups | `ringgroup-create`, `ringgroup-details`, `ringgroup-list`, `ringgroup-update`, `ringgroup-delete` |
+| Call center | `callcenter-queue-list`, `callcenter-queue-status`, `callcenter-agent-list`, `callcenter-agent-status`, `callcenter-agent-state` |
+| Active calls | `originate`, `call-list`, `call-answer`, `call-hangup`, `call-hold`, `call-resume`, `call-transfer`, `call-transfer-attended` |
+| Call history | `cdr-search`, `cdr-details`, `cdr-list` (legacy) |
+| Call recordings | `recording-details`, `recording-download` |
+
+Each action is documented under [Actions](#actions). Requests are authenticated with API keys bound to FusionPBX users, and every action checks the user's FusionPBX permissions and domain.
 
 # Use
 
@@ -121,12 +136,13 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 ## Upgrading from earlier versions
 
-From 1.0.0:
+From 1.0.0 to 2.0.0:
 - `originate` calls `destination_a` first, as documented (it used to call `destination_b` first), and answers `201` with the call (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`) instead of `{"success": ..., "call_uuid": ...}`. A call FreeSWITCH can't place now answers `500` instead of `200` with `success: false`.
 - Run Advanced → Upgrade → Permission Defaults: it adds the plugin's `rest_api_call_control` permission (to the superadmin and admin groups), which the call control actions need.
 - `extension-create` and `extension-details` return `enabled` as a JSON boolean, like `extension-list`, whatever the database's column type (it was `"true"`/`"false"` text on sqlite and mysql).
 - `extension-create` answers `201` instead of `200` on success. An existing number answers `409` instead of `500`, and an invalid `extension` or caller ID now answers `400` instead of being saved.
 - `ringgroup-create` answers `201` instead of `200`, with the ring group as `ringgroup-details` returns it (`ring_group_uuid`, `domain_uuid`, `name`, `extension`, `strategy`, `destinations`) instead of FusionPBX's columns and `ring_group_destinations`. An existing extension answers `409` instead of `500`. `destinations` may now be a JSON array; invalid destinations answer `400 {"error": "invalid destinations"}` instead of the previous messages.
+- `destination-details` answers `409 {"error": "ambiguous destination"}` when FusionPBX has the number more than once (another context or prefix, or another domain when searching every domain), instead of returning one of them.
 - `extension-list` returns `{"data": [...], "pagination": {...}}` instead of a bare array, 25 extensions per page by default (up to 200 with `per_page`), with the fields documented below instead of `extension_uuid`, `extension` and `emergency_caller_id_number` only. Callers must read `data` and follow the pages.
 
 Version 1.0.0 is the first release. Coming from the AccelerateNetworks code, or from a checkout older than 1.0.0, note that it changes how keys work:
