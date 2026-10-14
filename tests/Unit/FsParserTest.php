@@ -36,6 +36,15 @@ class FsParserTest extends TestCase
 		$this->assertSame(array('api show channels'), FakeStore::read()['esl_commands']);
 	}
 
+	// mod_callcenter prints the header with the first row only, so an empty
+	// list is a bare +OK
+	public function testParsesAnEmptyListAnsweredWithoutAHeader(): void
+	{
+		$this->respondWith("+OK\n");
+
+		$this->assertSame(array(), parse_fs('api callcenter_config queue list members 800@tenant1.example.com'));
+	}
+
 	public function testReturnsAnErrorWhenFreeswitchRejectsTheCommand(): void
 	{
 		$this->respondWith("-ERR no such command\n");
@@ -51,5 +60,71 @@ class FsParserTest extends TestCase
 
 		$this->assertSame(array('error' => 'Failed to connect to event socket'), parse_fs('api show channels'));
 		$this->assertSame(array(), FakeStore::read()['esl_commands']);
+	}
+
+	// commands like "callcenter_config agent get status" answer a bare value
+	public function testReadsASingleValue(): void
+	{
+		$this->respondWith("Available (On Demand)\n");
+
+		$this->assertSame('Available (On Demand)', fs_api_value('api callcenter_config agent get status x'));
+		$this->assertSame(array('api callcenter_config agent get status x'), FakeStore::read()['esl_commands']);
+	}
+
+	public function testReadsAnOkReply(): void
+	{
+		$this->respondWith("+OK\n");
+
+		$this->assertSame('+OK', fs_api_value('api callcenter_config agent set state x Waiting'));
+	}
+
+	public function testReportsARejectedSingleValue(): void
+	{
+		$this->respondWith("-ERR Invalid Agent!\n");
+
+		$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent!'), fs_api_value('api callcenter_config agent get status x'));
+	}
+
+	// 5.6.5's event_socket_request() returns false when it can't connect
+	public function testReportsAnEmptyOrFailedReply(): void
+	{
+		foreach (array('', false) as $response) {
+			FakeStore::update(function (&$state) use ($response) {
+				$state['esl_response'] = $response;
+			});
+
+			$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => ''), fs_api_value('api callcenter_config agent get status x'), json_encode($response));
+		}
+	}
+
+	public function testReportsAnUnavailableEventSocketForASingleValue(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['esl_available'] = false;
+		});
+
+		$this->assertSame(array('error' => 'Failed to connect to event socket'), fs_api_value('api callcenter_config agent get status x'));
+	}
+
+	// "show channels as json" and the like
+	public function testDecodesAJsonReply(): void
+	{
+		$this->respondWith("{\"row_count\":1,\"rows\":[{\"uuid\":\"a1\"}]}\n");
+
+		$this->assertSame(array('row_count' => 1, 'rows' => array(array('uuid' => 'a1'))), fs_api_json('api show channels as json'));
+	}
+
+	public function testReportsAReplyThatIsNotJson(): void
+	{
+		$this->respondWith("+OK\n");
+
+		$this->assertSame(array('error' => 'freeswitch reply is not JSON', 'details' => '+OK'), fs_api_json('api show channels as json'));
+	}
+
+	public function testReportsARejectedJsonCommand(): void
+	{
+		$this->respondWith("-ERR no reply\n");
+
+		$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => '-ERR no reply'), fs_api_json('api show channels as json'));
 	}
 }

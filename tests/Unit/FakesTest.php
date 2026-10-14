@@ -174,6 +174,31 @@ class FakesTest extends TestCase
 		$this->assertSame($links, FakeStore::read()['tables']['v_extension_users']);
 	}
 
+	// actions that send several commands need a reply per command
+	public function testEventSocketRepliesPerCommandWhenGiven(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['esl_responses']['api status'] = "UP 0 years\n";
+		});
+
+		$this->assertSame("UP 0 years\n", event_socket_request('fake-socket', 'api status'));
+		$this->assertSame(FakeStore::read()['esl_response'], event_socket_request('fake-socket', 'api other'));
+		$this->assertSame(array('api status', 'api other'), FakeStore::read()['esl_commands']);
+	}
+
+	// a command sent twice can get different replies, e.g. a call's state
+	// before and after answering it; the last one keeps answering
+	public function testEventSocketRepliesInTurnWhenGivenAList(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['esl_responses']['api uuid_dump x json'] = array("before\n", "after\n");
+		});
+
+		$this->assertSame("before\n", event_socket_request('fake-socket', 'api uuid_dump x json'));
+		$this->assertSame("after\n", event_socket_request('fake-socket', 'api uuid_dump x json'));
+		$this->assertSame("after\n", event_socket_request('fake-socket', 'api uuid_dump x json'));
+	}
+
 	// FusionPBX's settings: default settings by category and subcategory
 	public function testSettingsReturnTheStoredValueOrTheDefault(): void
 	{

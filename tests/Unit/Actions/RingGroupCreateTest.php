@@ -5,6 +5,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
 
+/**
+ * ringgroup-create: 201 with the ring group as ringgroup-details returns it,
+ * 409 when the extension already has one.
+ */
 #[RunTestsInSeparateProcesses]
 class RingGroupCreateTest extends ActionTestCase
 {
@@ -28,7 +32,7 @@ class RingGroupCreateTest extends ActionTestCase
 			'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001',
 			'name' => 'Sales',
 			'extension' => '200',
-			'destinations' => '[{"number": "100"}, {"number": "101"}]',
+			'destinations' => array(array('number' => '100'), array('number' => '101')),
 			'strategy' => 'simultaneous',
 		), $overrides);
 	}
@@ -45,10 +49,55 @@ class RingGroupCreateTest extends ActionTestCase
 		$this->assertSame(array('100', '101'), array_column($tables['v_ring_group_destinations'], 'destination_number'));
 		$this->assertSame('tenant1.example.com', $tables['v_dialplans'][0]['dialplan_context']);
 		$this->assertStringContainsString('<condition field="destination_number" expression="^200$">', $tables['v_dialplans'][0]['dialplan_xml']);
-		$this->assertSame(array_merge(REST_API_RING_GROUP_FIELDS, array('ring_group_destinations')), array_keys($result));
-		$this->assertSame(array('100', '101'), array_column($result['ring_group_destinations'], 'destination_number'));
-		$this->assertSame(REST_API_RING_GROUP_DESTINATION_FIELDS, array_keys($result['ring_group_destinations'][0]));
 		$this->assertSame(array(), $this->state()['skipped'], 'the declared permissions must cover every saved table');
+	}
+
+	// as ring_group_edit.php does, so the extension routes right away rather
+	// than once the cached dialplan expires
+	public function testClearsTheDialplanCacheOfTheContext(): void
+	{
+		$this->runAction($this->body());
+
+		$this->assertSame(array('dialplan:tenant1.example.com'), $this->state()['cache_deleted']);
+	}
+
+	public function testAnswersCreatedWithTheRingGroupAsRingGroupDetailsReturnsIt(): void
+	{
+		$result = $this->runAction($this->body());
+
+		$this->assertSame(array(
+			'ring_group_uuid' => $this->state()['tables']['v_ring_groups'][1]['ring_group_uuid'],
+			'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001',
+			'name' => 'Sales',
+			'extension' => '200',
+			'strategy' => 'simultaneous',
+			'destinations' => array(array('number' => '100'), array('number' => '101')),
+			'code' => 201,
+		), $result);
+	}
+
+	// JSON objects reach the action as objects
+	public function testAcceptsDestinationsAsObjects(): void
+	{
+		$result = $this->runAction($this->body(array('destinations' => array((object)array('number' => '100')))));
+
+		$this->assertSame(array(array('number' => '100')), $result['destinations']);
+	}
+
+	// older clients send the list as a JSON-encoded string
+	public function testStillAcceptsDestinationsAsAJsonString(): void
+	{
+		$result = $this->runAction($this->body(array('destinations' => '[{"number": "100"}, {"number": "101"}]')));
+
+		$this->assertSame(201, $result['code']);
+		$this->assertSame(array(array('number' => '100'), array('number' => '101')), $result['destinations']);
+	}
+
+	public function testANumberGivenTwiceRingsOnce(): void
+	{
+		$this->runAction($this->body(array('destinations' => array(array('number' => '100'), array('number' => '100')))));
+
+		$this->assertSame(array('100'), array_column($this->state()['tables']['v_ring_group_destinations'], 'destination_number'));
 	}
 
 	public function testEscapesTheNameInTheDialplanXml(): void
@@ -68,34 +117,43 @@ class RingGroupCreateTest extends ActionTestCase
 		$this->assertStringContainsString('expression="^\*200$"', $this->state()['tables']['v_dialplans'][0]['dialplan_xml']);
 	}
 
-	public function testRejectsAnExtensionThatAlreadyHasARingGroup(): void
+	public function testAnswersConflictForAnExtensionThatAlreadyHasARingGroup(): void
 	{
-		$this->runAction($this->body(array('extension' => '300')));
-
+		$this->assertSame(array('error' => 'ring group already exists', 'code' => 409), $this->runAction($this->body(array('extension' => '300'))));
 		$this->assertSame(array(), $this->state()['saved']);
 	}
 
 	public static function invalidInput(): array
 	{
 		return array(
-			'unknown strategy' => array('strategy', 'all-at-once'),
-			'extension injecting XML' => array('extension', '200$"><action application="system" data="id'),
-			'extension regex' => array('extension', '.*'),
-			'destinations not JSON' => array('destinations', 'not json'),
-			'destinations not a list' => array('destinations', '{"number": "100"}'),
-			'empty destinations' => array('destinations', '[]'),
-			'destination with unsafe number' => array('destinations', '[{"number": "100;id"}]'),
-			'destination without number' => array('destinations', '[{"extension": "100"}]'),
-			'name not a string' => array('name', array('Sales')),
+			'unknown strategy' => array('strategy', 'all-at-once', 'strategy'),
+			'extension injecting XML' => array('extension', '200$"><action application="system" data="id', 'extension'),
+			'extension regex' => array('extension', '.*', 'extension'),
+			'destinations not JSON' => array('destinations', 'not json', 'destinations'),
+			'destinations not a list' => array('destinations', '{"number": "100"}', 'destinations'),
+			'empty destinations' => array('destinations', array(), 'destinations'),
+			'empty destinations string' => array('destinations', '[]', 'destinations'),
+			'destination with unsafe number' => array('destinations', array(array('number' => '100;id')), 'destinations'),
+			'destination without number' => array('destinations', array(array('extension' => '100')), 'destinations'),
+			'name not a string' => array('name', array('Sales'), 'name'),
+			'name with a newline' => array('name', "Sales\nTeam", 'name'),
 		);
 	}
 
 	#[DataProvider('invalidInput')]
-	public function testRejectsInvalidInputWithoutSaving(string $field, $value): void
+	public function testRejectsInvalidInputWithoutSaving(string $field, $value, string $name): void
 	{
-		$result = $this->runAction($this->body(array($field => $value)));
+		$this->assertSame(array('error' => 'invalid '.$name, 'code' => 400), $this->runAction($this->body(array($field => $value))));
+		$this->assertSame(array(), $this->state()['saved']);
+	}
 
-		$this->assertSame(400, $result['code']);
+	// select() returns false on a database error, which must not pass for
+	// "no such ring group" and create a duplicate
+	public function testAnswers500WhenTheDatabaseFails(): void
+	{
+		$this->failSelects();
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $this->runAction($this->body()));
 		$this->assertSame(array(), $this->state()['saved']);
 	}
 
@@ -103,15 +161,16 @@ class RingGroupCreateTest extends ActionTestCase
 	{
 		$this->failSaves();
 
-		$this->assertSame(array('error' => 'error adding ring group'), $this->runAction($this->body()));
+		$this->assertSame(array('error' => 'error adding ring group', 'code' => 500), $this->runAction($this->body()));
 		$this->assertCount(1, $this->state()['tables']['v_ring_groups']);
+		$this->assertSame(array(), $this->state()['cache_deleted']);
 	}
 
-	public function testRejectsAnUnknownDomain(): void
+	public function testAnswersNotFoundForAnUnknownDomain(): void
 	{
 		$result = $this->runAction($this->body(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-00000000ffff')));
 
-		$this->assertSame(array('error' => 'domain not found'), $result);
+		$this->assertSame(array('error' => 'domain not found', 'code' => 404), $result);
 		$this->assertSame(array(), $this->state()['saved']);
 	}
 }

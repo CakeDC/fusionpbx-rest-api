@@ -30,6 +30,10 @@ require_once "resources/require.php";
 require_once "lib/input_validation.php";
 require_once "lib/auth.php";
 require_once "lib/fields.php";
+require_once "lib/fs_parser.php";
+require_once "lib/call_center.php";
+require_once "lib/recordings.php";
+require_once "lib/calls.php";
 
 // whatever require.php did, never save the session. cookies are disabled, so
 // any session started from here on is a new, empty one and safe to destroy
@@ -148,6 +152,20 @@ if(function_exists('do_action')) {
 		unset($resp['code']);
 	} elseif(!empty($resp['error'])) {
 		http_response_code(500);
+	}
+
+	// an action can answer with a file, streamed rather than held in memory
+	if(isset($resp['send_file']) && is_array($resp['send_file'])) {
+		$file = $resp['send_file'];
+		header('Content-Type: '.$file['content_type']);
+		header('Content-Length: '.filesize($file['path']));
+		// the name can't break out of the header's quotes
+		header('Content-Disposition: attachment; filename="'.preg_replace('/[^A-Za-z0-9._-]/', '_', $file['name']).'"');
+		while(ob_get_level() > 0) {
+			ob_end_clean();
+		}
+		readfile($file['path']);
+		exit;
 	}
 
 	// a 204 has no body

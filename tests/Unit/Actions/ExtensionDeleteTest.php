@@ -150,6 +150,7 @@ class ExtensionDeleteTest extends ActionTestCase
 	// behind is logged rather than lost silently
 	public function testLogsVoicemailFilesItCantRemove(): void
 	{
+		$this->skipAsRoot();
 		$box = $this->voicemailDir.'/default/tenant1.example.com/100';
 		chmod($box, 0555);
 		$log = tempnam(sys_get_temp_dir(), 'rest_api_log');
