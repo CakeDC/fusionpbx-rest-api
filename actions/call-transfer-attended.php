@@ -1,6 +1,7 @@
 <?php
 $required_params = array("call_uuid", "stage");
-$required_permissions = array("call_active_transfer");
+// FusionPBX has no permission to transfer a call (see app_config.php)
+$required_permissions = array("rest_api_call_control");
 
 // warm transfer with FreeSWITCH's att_xfer, run on the agent's leg (call_uuid,
 // bridged to the caller). not yet verified on a real FusionPBX 5.6.5 call.

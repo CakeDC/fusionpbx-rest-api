@@ -78,8 +78,8 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `call-hold` | `rest_api_call_control` |
 | `call-list` | `call_active_view` |
 | `call-resume` | `rest_api_call_control` |
-| `call-transfer` | `call_active_transfer` |
-| `call-transfer-attended` | `call_active_transfer` |
+| `call-transfer` | `rest_api_call_control` |
+| `call-transfer-attended` | `rest_api_call_control` |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
@@ -419,7 +419,7 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 
 Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain (its `domain_uuid` variable) is checked first: a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
-FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding and resuming a call use it too.
+FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding, resuming and transferring a call use it too.
 
 ## `call-hangup`
 | Parameter     | Required | Description |

@@ -1,6 +1,7 @@
 <?php
 $required_params = array("call_uuid", "target_type", "target");
-$required_permissions = array("call_active_transfer");
+// FusionPBX has no permission to transfer a call (see app_config.php)
+$required_permissions = array("rest_api_call_control");
 
 // blind transfer of a call of the domain to an extension, ring group or
 // queue of the domain. call_uuid is the agent's call: when it is bridged, the
