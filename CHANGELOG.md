@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-- `call-transfer` and `call-transfer-attended` answered `403` to every key: they required `call_active_transfer`, which FusionPBX 5.6.5 doesn't define, so no group could hold it. They now need `rest_api_call_control`, like `call-answer`, `call-hold` and `call-resume`.
+- `call-transfer` and `call-transfer-attended` answered `403` to every key: they required `call_active_transfer`, which FusionPBX 5.6.5 doesn't define, so no group could hold it. They now need `rest_api_call_control`, like `call-answer`, `call-hold` and `call-resume`. The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`, as `originate` does: it dials any number the domain routes, outbound ones included.
 
 ## [2.0.0] - 2026-10-14
 

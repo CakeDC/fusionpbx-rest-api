@@ -6,7 +6,7 @@ $required_permissions = array("rest_api_call_control");
 // warm transfer with FreeSWITCH's att_xfer, run on the agent's leg (call_uuid,
 // bridged to the caller). not yet verified on a real FusionPBX 5.6.5 call.
 // - consult: att_xfer holds the caller with music and calls the target through
-//   the domain's dialplan. the consult leg's uuid and the number consulted
+//   the domain's dialplan (needs click_to_call_call, as originate). the consult leg's uuid and the number consulted
 //   are noted on the agent's channel (rest_api_consult_uuid,
 //   rest_api_consult_target), so nothing is kept between requests
 // - cancel: hangs up the consult leg; att_xfer returns the agent to the caller
@@ -21,6 +21,11 @@ function do_action($body) {
         return array("error" => "invalid stage", "code" => 400);
     }
     if($body->stage === "consult") {
+        // the target is dialed through the domain's dialplan, outbound routes
+        // included, so consulting needs originate's permission
+        if(!permission_exists("click_to_call_call")) {
+            return array("error" => "forbidden", "missing_permissions" => array("click_to_call_call"), "code" => 403);
+        }
         // the target goes into a dial string
         if(!isset($body->target) || !is_dial_number($body->target)) {
             return array("error" => "invalid target", "code" => 400);

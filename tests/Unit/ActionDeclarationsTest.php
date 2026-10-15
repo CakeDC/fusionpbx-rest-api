@@ -60,21 +60,36 @@ class ActionDeclarationsTest extends TestCase
 	);
 
 	// The FusionPBX permissions the plugin checks, each one declared by an
-	// app_config.php of FusionPBX 5.6.5. A permission no app declares can't be
-	// given to any group (5.6.5 only has call_active_transfer commented out),
-	// so check a new one there before adding it here.
+	// app_config.php of FusionPBX 5.6.5 (check a new one with, in a FusionPBX
+	// 5.6.5 checkout: grep -rn '"<name>"' --include=app_config.php). A permission
+	// no app declares can't be given to any group: 5.6.5 has
+	// call_active_transfer commented out, for instance.
 	private const FUSIONPBX_PERMISSIONS = array(
 		'call_active_hangup', 'call_active_view', 'call_center_active_view', 'call_center_agent_edit',
 		'call_center_agent_view', 'call_center_queue_view', 'call_center_tier_view', 'call_recording_download',
 		'call_recording_view', 'click_to_call_call', 'destination_add', 'destination_delete', 'destination_edit',
 		'destination_view', 'dialplan_add', 'dialplan_delete', 'dialplan_detail_add', 'dialplan_detail_delete',
-		'dialplan_edit', 'domain_select', 'domain_view', 'extension_add', 'extension_delete', 'extension_edit',
-		'extension_password', 'extension_setting_delete', 'extension_user_add', 'extension_user_delete',
-		'extension_view', 'follow_me_delete', 'follow_me_destination_delete', 'ring_group_add',
+		'dialplan_edit', 'domain_select', 'domain_view', 'effective_caller_id_name', 'effective_caller_id_number',
+		'emergency_caller_id_name', 'emergency_caller_id_number', 'extension_add', 'extension_delete',
+		'extension_edit', 'extension_enabled', 'extension_password', 'extension_setting_delete',
+		'extension_user_add', 'extension_user_delete', 'extension_view', 'follow_me_delete',
+		'follow_me_destination_delete', 'outbound_caller_id_name', 'outbound_caller_id_number', 'ring_group_add',
 		'ring_group_delete', 'ring_group_destination_add', 'ring_group_destination_delete',
 		'ring_group_destination_view', 'ring_group_edit', 'ring_group_user_delete', 'ring_group_view', 'user_view',
 		'voicemail_add', 'voicemail_delete', 'voicemail_destination_delete', 'voicemail_greeting_delete',
 		'voicemail_message_delete', 'voicemail_option_delete', 'xml_cdr_view',
+	);
+
+	// Permissions actions check at run time through a list, per field given,
+	// which the permission_exists() scan below can't see
+	private const FIELD_PERMISSIONS = array(
+		'call-transfer-attended' => array('click_to_call_call'),
+		'extension-update' => array(
+			'effective_caller_id_name', 'outbound_caller_id_name', 'emergency_caller_id_name',
+			'effective_caller_id_number', 'outbound_caller_id_number', 'emergency_caller_id_number',
+			'extension_enabled', 'extension_user_add', 'extension_user_delete',
+		),
+		'ringgroup-update' => array('dialplan_edit', 'ring_group_destination_add', 'ring_group_destination_delete'),
 	);
 
 	private function definedPermissions(): array
@@ -100,6 +115,18 @@ class ActionDeclarationsTest extends TestCase
 		foreach ($files as $file) {
 			preg_match_all('/permission_exists\(\s*[\'"]([a-z_]+)[\'"]/', file_get_contents($file), $matches);
 			$this->assertSame(array(), array_values(array_diff($matches[1], $defined)), basename($file).' checks a permission neither FusionPBX nor the plugin defines');
+		}
+	}
+
+	public function testEveryFieldPermissionIsCheckedAndDefined(): void
+	{
+		$defined = $this->definedPermissions();
+		foreach (self::FIELD_PERMISSIONS as $action => $permissions) {
+			$source = file_get_contents(PLUGIN_DIR.'/actions/'.$action.'.php');
+			foreach ($permissions as $permission) {
+				$this->assertStringContainsString('"'.$permission.'"', $source, $action.' no longer checks '.$permission);
+			}
+			$this->assertSame(array(), array_values(array_diff($permissions, $defined)), $action.' checks a permission neither FusionPBX nor the plugin defines');
 		}
 	}
 

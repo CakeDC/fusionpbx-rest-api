@@ -61,6 +61,19 @@ class RestPermissionsTest extends RestApiTestCase
 		$this->assertSame(array('click_to_call_call'), $this->json($response)['missing_permissions']);
 	}
 
+	// FusionPBX 5.6.5 has no permission to transfer a call
+	public function testTransfersNeedTheCallControlPermission(): void
+	{
+		$this->grantOnly(array_values(array_diff(self::ACTION_PERMISSIONS, array('rest_api_call_control'))));
+
+		foreach (array('call-transfer', 'call-transfer-attended') as $action) {
+			$response = $this->api(array('action' => $action, 'domain_uuid' => self::DOMAIN_UUID));
+
+			$this->assertSame(403, $response['status'], $action);
+			$this->assertSame(array('error' => 'forbidden', 'missing_permissions' => array('rest_api_call_control')), $this->json($response), $action);
+		}
+	}
+
 	public function testActionsWithoutPermissionsOnlyNeedAUsableKey(): void
 	{
 		$this->grantOnly(array());

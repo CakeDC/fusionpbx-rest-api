@@ -79,7 +79,7 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `call-list` | `call_active_view` |
 | `call-resume` | `rest_api_call_control` |
 | `call-transfer` | `rest_api_call_control` |
-| `call-transfer-attended` | `rest_api_call_control` |
+| `call-transfer-attended` | `rest_api_call_control`, plus `click_to_call_call` for the `consult` stage |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
@@ -483,7 +483,7 @@ Either way the agent is done with the call: it is returned as `call-list` return
 
 Warm (attended) transfer with FreeSWITCH's `att_xfer`, run on the agent's leg:
 
-* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time, ringing or answered (`400 {"error": "consultation already in progress"}`). Returns the agent's call with `state` `held` and `consulting` set to `target`.
+* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. `target` can be any number the domain's dialplan routes, outbound ones included, so this stage also needs `click_to_call_call`, as `originate` does (`403` with `missing_permissions` without it). The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time, ringing or answered (`400 {"error": "consultation already in progress"}`). Returns the agent's call with `state` `held` and `consulting` set to `target`.
 * `cancel`: the consultation is hung up, ringing or answered, and the agent is back with the caller. Returns the agent's call.
 * `complete`: the agent's leg is hung up and the caller is bridged to the consulted party. Only once the consulted party has answered and talks with the agent (`400 {"error": "consultation not answered"}`, the consultation goes on); otherwise hanging up the agent would end the call. Returns the agent's call as it was before, with `state` `ended`.
 

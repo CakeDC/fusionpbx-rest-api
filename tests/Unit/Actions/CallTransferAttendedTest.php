@@ -31,6 +31,13 @@ class CallTransferAttendedTest extends ActionTestCase
 		return 'call-transfer-attended';
 	}
 
+	protected function setUp(): void
+	{
+		parent::setUp();
+		// consult dials the target, as originate does
+		$this->grantOnly(array('rest_api_call_control', 'click_to_call_call'));
+	}
+
 	private static function agent(array $fields = array()): string
 	{
 		return json_encode($fields + array(
@@ -163,6 +170,31 @@ class CallTransferAttendedTest extends ActionTestCase
 
 		$this->assertSame(array('error' => 'consultation already in progress', 'code' => 400), $this->transfer('consult', array('target' => '103')));
 		$this->assertSame(array(self::DUMP_AGENT, self::DUMP_CONSULT), $this->commands());
+	}
+
+	// consult dials any number through the domain's dialplan, outbound routes
+	// included, so it needs originate's permission
+	public function testConsultNeedsThePermissionToDial(): void
+	{
+		$this->grantOnly(array('rest_api_call_control'));
+		$this->replies(array(self::agent()));
+
+		$this->assertSame(array('error' => 'forbidden', 'missing_permissions' => array('click_to_call_call'), 'code' => 403), $this->transfer('consult', array('target' => '102')));
+		$this->assertSame(array(), $this->commands());
+	}
+
+	public static function stagesThatDontDial(): array
+	{
+		return array('cancel' => array('cancel', 'bridged'), 'complete' => array('complete', 'ended'));
+	}
+
+	#[DataProvider('stagesThatDontDial')]
+	public function testOnlyConsultNeedsThePermissionToDial(string $stage, string $state): void
+	{
+		$this->grantOnly(array('rest_api_call_control'));
+		$this->replies(array(self::consulting(), self::agent()));
+
+		$this->assertSame($state, $this->transfer($stage)['state'] ?? null);
 	}
 
 	// the target goes into a dial string
