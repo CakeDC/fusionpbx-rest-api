@@ -35,7 +35,7 @@ class AppConfigTest extends TestCase
 		}
 	}
 
-	// FusionPBX 5.6.5 has no permission to answer, hold or resume a call
+	// FusionPBX 5.6.5 has no permission to answer, hold, resume or transfer a call
 	public function testDeclaresTheCallControlPermissionForAdmins(): void
 	{
 		$permissions = array_column($this->app()['permissions'], null, 'name');

@@ -78,8 +78,8 @@ Each action needs these FusionPBX permissions in the key user's groups:
 | `call-hold` | `rest_api_call_control` |
 | `call-list` | `call_active_view` |
 | `call-resume` | `rest_api_call_control` |
-| `call-transfer` | `call_active_transfer` |
-| `call-transfer-attended` | `call_active_transfer` |
+| `call-transfer` | `rest_api_call_control` |
+| `call-transfer-attended` | `rest_api_call_control`, plus `click_to_call_call` for the `consult` stage |
 | `callcenter-agent-list` | `call_center_agent_view`, `call_center_tier_view` |
 | `callcenter-agent-state` | `call_center_agent_view`, `call_center_agent_edit` |
 | `callcenter-agent-status` | `call_center_agent_view`, plus `call_center_agent_edit` to set the status |
@@ -419,7 +419,7 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 
 Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain (its `domain_uuid` variable) is checked first: a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
-FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding and resuming a call use it too.
+FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding, resuming and transferring a call use it too.
 
 ## `call-hangup`
 | Parameter     | Required | Description |
@@ -483,7 +483,7 @@ Either way the agent is done with the call: it is returned as `call-list` return
 
 Warm (attended) transfer with FreeSWITCH's `att_xfer`, run on the agent's leg:
 
-* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time, ringing or answered (`400 {"error": "consultation already in progress"}`). Returns the agent's call with `state` `held` and `consulting` set to `target`.
+* `consult`: the caller is put on hold with music and `target` is called from the agent's leg. `target` can be any number the domain's dialplan routes, outbound ones included, so this stage also needs `click_to_call_call`, as `originate` does (`403` with `missing_permissions` without it). The call must be bridged (`400 {"error": "call is not bridged"}`), and only one consultation runs at a time, ringing or answered (`400 {"error": "consultation already in progress"}`). Returns the agent's call with `state` `held` and `consulting` set to `target`.
 * `cancel`: the consultation is hung up, ringing or answered, and the agent is back with the caller. Returns the agent's call.
 * `complete`: the agent's leg is hung up and the caller is bridged to the consulted party. Only once the consulted party has answered and talks with the agent (`400 {"error": "consultation not answered"}`, the consultation goes on); otherwise hanging up the agent would end the call. Returns the agent's call as it was before, with `state` `ended`.
 
