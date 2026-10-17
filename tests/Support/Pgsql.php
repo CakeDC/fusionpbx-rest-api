@@ -11,9 +11,10 @@ use PDOException;
  * The database is named by REST_API_PGSQL_DSN, e.g.
  * "pgsql:host=127.0.0.1 port=5432 dbname=fusionpbx user=fusionpbx password=fusionpbx".
  *
- * v_xml_cdr has FusionPBX 5.6.5's columns and types (app/xml_cdr/app_config.php).
- * Before each query it is reloaded from the FakeStore rows when they changed,
- * so tests seed and edit rows as they do for fake_sql().
+ * The tables have FusionPBX 5.6.5's columns and types (the app_config.php of
+ * app/xml_cdr, app/extensions, core/users and core/domains). Before each query
+ * they are reloaded from the FakeStore rows when they changed, so tests seed
+ * and edit rows as they do for fake_sql(), and save() keeps writing there.
  */
 final class Pgsql
 {
@@ -40,8 +41,54 @@ final class Pgsql
 		json jsonb, insert_date timestamptz, insert_user uuid, update_date timestamptz, update_user uuid
 	)';
 
+	private const V_EXTENSIONS = 'CREATE TABLE IF NOT EXISTS v_extensions (
+		extension_uuid uuid PRIMARY KEY, domain_uuid uuid, extension text, number_alias text, password text,
+		accountcode text, effective_caller_id_name text, effective_caller_id_number text,
+		outbound_caller_id_name text, outbound_caller_id_number text, emergency_caller_id_name text,
+		emergency_caller_id_number text, directory_first_name text, directory_last_name text,
+		directory_visible boolean, directory_exten_visible boolean, max_registrations text, limit_max text,
+		limit_destination text, missed_call_app text, missed_call_data text, user_context text, toll_allow text,
+		call_timeout numeric, call_group text, call_screen_enabled boolean, user_record text, hold_music text,
+		auth_acl text, cidr text, sip_force_contact text, nibble_account text, sip_force_expires numeric,
+		mwi_account text, sip_bypass_media text, unique_id numeric, dial_string text, dial_user text,
+		dial_domain text, do_not_disturb boolean, forward_all_destination text, forward_all_enabled boolean,
+		forward_busy_destination text, forward_busy_enabled boolean, forward_no_answer_destination text,
+		forward_no_answer_enabled boolean, forward_user_not_registered_destination text,
+		forward_user_not_registered_enabled boolean, follow_me_uuid uuid, follow_me_enabled boolean,
+		follow_me_destinations text, extension_language text, extension_dialect text, extension_voice text,
+		extension_type text, enabled boolean, description text, absolute_codec_string text, force_ping boolean,
+		insert_date timestamptz, insert_user uuid, update_date timestamptz, update_user uuid
+	)';
+
+	private const V_EXTENSION_USERS = 'CREATE TABLE IF NOT EXISTS v_extension_users (
+		extension_user_uuid uuid PRIMARY KEY, domain_uuid uuid, extension_uuid uuid, user_uuid uuid,
+		insert_date timestamptz, insert_user uuid, update_date timestamptz, update_user uuid
+	)';
+
+	private const V_USERS = 'CREATE TABLE IF NOT EXISTS v_users (
+		user_uuid uuid PRIMARY KEY, id serial, domain_uuid uuid, contact_uuid uuid, v_id text, username text,
+		password text, salt text, user_email text, user_status text, user_time_zone text, api_key text,
+		user_totp_secret text, user_type text, user_enabled boolean, add_user text, add_date text,
+		insert_date timestamptz, insert_user uuid, update_date timestamptz, update_user uuid
+	)';
+
+	private const V_DOMAINS = 'CREATE TABLE IF NOT EXISTS v_domains (
+		domain_uuid uuid PRIMARY KEY, domain_parent_uuid uuid, domain_name text, domain_enabled boolean,
+		domain_description text, insert_date timestamptz, insert_user uuid, update_date timestamptz,
+		update_user uuid
+	)';
+
+	private const TABLES = array(
+		'v_xml_cdr' => self::V_XML_CDR,
+		'v_extensions' => self::V_EXTENSIONS,
+		'v_extension_users' => self::V_EXTENSION_USERS,
+		'v_users' => self::V_USERS,
+		'v_domains' => self::V_DOMAINS,
+	);
+
 	private PDO $db;
-	private ?string $loaded = null;
+	/** @var array<string, string> hash of the FakeStore rows each table holds */
+	private array $loaded = array();
 
 	private function __construct(string $dsn)
 	{
@@ -49,7 +96,9 @@ final class Pgsql
 		$this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		// timestamps come back as the fixtures write them
 		$this->db->exec("SET TIME ZONE 'UTC'");
-		$this->db->exec(self::V_XML_CDR);
+		foreach (self::TABLES as $ddl) {
+			$this->db->exec($ddl);
+		}
 	}
 
 	/** Connect and put it behind the fake database class. Null when REST_API_PGSQL_DSN isn't set. */
@@ -109,21 +158,28 @@ final class Pgsql
 		}
 	}
 
-	// copy the FakeStore rows of v_xml_cdr into the table, when they changed
+	// copy the FakeStore rows of each table into it, when they changed
 	private function load(): void
 	{
-		$rows = FakeStore::read()['tables']['v_xml_cdr'] ?? array();
-		$hash = md5(serialize($rows));
-		if ($hash === $this->loaded) {
-			return;
+		$tables = FakeStore::read()['tables'];
+		foreach (array_keys(self::TABLES) as $table) {
+			$rows = $tables[$table] ?? array();
+			$hash = md5(serialize($rows));
+			if ($hash === ($this->loaded[$table] ?? null)) {
+				continue;
+			}
+			$this->db->exec('TRUNCATE '.$table);
+			foreach ($rows as $row) {
+				// FusionPBX's save() writes an empty string as NULL
+				$row = array_map(function ($value) {
+					return $value === '' ? null : $value;
+				}, $row);
+				$columns = array_keys($row);
+				$sql = 'INSERT INTO '.$table.' ('.implode(', ', $columns).') VALUES (:'.implode(', :', $columns).')';
+				$this->db->prepare($sql)->execute($row);
+			}
+			$this->db->exec('ANALYZE '.$table);
+			$this->loaded[$table] = $hash;
 		}
-		$this->db->exec('TRUNCATE v_xml_cdr');
-		foreach ($rows as $row) {
-			$columns = array_keys($row);
-			$sql = 'INSERT INTO v_xml_cdr ('.implode(', ', $columns).') VALUES (:'.implode(', :', $columns).')';
-			$this->db->prepare($sql)->execute($row);
-		}
-		$this->db->exec('ANALYZE v_xml_cdr');
-		$this->loaded = $hash;
 	}
 }
