@@ -29,7 +29,7 @@
     },
     "scripts-descriptions": {
         "test": "Run the test suite",
-        "test-pgsql": "Run the pgsql suite (CDR SQL and the App Defaults index) on PostgreSQL in Docker",
+        "test-pgsql": "Run the pgsql suite (CDR and extension SQL, the App Defaults index) on PostgreSQL in Docker",
         "coverage": "Run the tests with code coverage (needs Xdebug) and write an HTML report to build/coverage/html"
     }
 }
