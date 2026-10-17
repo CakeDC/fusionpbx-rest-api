@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - `call-transfer` and `call-transfer-attended` answered `403` to every key: they required `call_active_transfer`, which FusionPBX 5.6.5 doesn't define, so no group could hold it. They now need `rest_api_call_control`, like `call-answer`, `call-hold` and `call-resume`. The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`, as `originate` does: it dials any number the domain routes, outbound ones included.
+- `extension-update` saved the change but answered `500` `database error`, `extension-create` answered `500` and `extension-details` `404`: the returned columns included `forward_caller_id_uuid`, which FusionPBX 5.6.5's `v_extensions` doesn't have, so PostgreSQL refused the query. The column is no longer returned.
 
 ## [2.0.0] - 2026-10-14
 
