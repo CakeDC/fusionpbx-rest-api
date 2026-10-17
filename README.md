@@ -627,7 +627,7 @@ composer test-pgsql                         # PostgreSQL 18 (the FusionPBX insta
 POSTGRES_VERSION=16 PHP_VERSION=8.4 composer test-pgsql
 ```
 
-To use a PostgreSQL of your own, set `REST_API_PGSQL_DSN` (e.g. `pgsql:host=127.0.0.1 port=5432 dbname=test user=test password=test`) and run `vendor/bin/phpunit --testsuite pgsql`; PHP needs `pdo_pgsql`. The suite creates and empties `v_xml_cdr`, `v_extensions`, `v_extension_users`, `v_users` and `v_domains` and creates `v_xml_cdr_originating_leg_uuid_idx`, so never point it at a FusionPBX database.
+To use a PostgreSQL of your own, set `REST_API_PGSQL_DSN` (e.g. `pgsql:host=127.0.0.1 port=5432 dbname=test user=test password=test`) and run `vendor/bin/phpunit --testsuite pgsql`; PHP needs `pdo_pgsql`. The suite creates and empties `v_xml_cdr`, `v_extensions`, `v_extension_users`, `v_users`, `v_domains` and `v_destinations` and creates `v_xml_cdr_originating_leg_uuid_idx`, so never point it at a FusionPBX database.
 
 To check that the tests catch a regression, run them against another checkout of the plugin, for example an older commit:
 

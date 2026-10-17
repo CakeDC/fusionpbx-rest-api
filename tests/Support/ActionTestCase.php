@@ -72,11 +72,14 @@ abstract class ActionTestCase extends TestCase
 		});
 	}
 
-	/** Make every database select() fail, as FusionPBX's returns false on a database error. */
-	protected function failSelects(): void
+	/**
+	 * Make database select() fail, as FusionPBX's returns false on a database
+	 * error: every query, or those whose SQL matches the regex.
+	 */
+	protected function failSelects(?string $pattern = null): void
 	{
-		FakeStore::update(function (&$state) {
-			$state['select_fails'] = true;
+		FakeStore::update(function (&$state) use ($pattern) {
+			$state['select_fails'] = $pattern ?? true;
 		});
 	}
 

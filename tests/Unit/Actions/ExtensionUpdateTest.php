@@ -110,7 +110,8 @@ class ExtensionUpdateTest extends ActionTestCase
 	{
 		$this->update(array('caller_id_name' => '', 'caller_id_number' => ''));
 
-		$this->assertSame(array_fill_keys(self::CALLER_ID_COLUMNS, ''), array_intersect_key($this->extension(), array_flip(self::CALLER_ID_COLUMNS)));
+		// FusionPBX's save() writes the empty string as NULL
+		$this->assertSame(array_fill_keys(self::CALLER_ID_COLUMNS, null),array_intersect_key($this->extension(), array_flip(self::CALLER_ID_COLUMNS)));
 	}
 
 	public function testReturnsTheUpdatedExtensionLikeExtensionDetails(): void
@@ -235,6 +236,26 @@ class ExtensionUpdateTest extends ActionTestCase
 		$this->failSelects();
 
 		$this->assertSame(array('error' => 'database error', 'code' => 500), $this->update(array('enabled' => false)));
+	}
+
+	// the change is saved by then: the log tells why the 500 came anyway
+	public function testLogsAFailedReadAfterTheSave(): void
+	{
+		$this->failSelects('/^SELECT '.preg_quote(implode(', ', REST_API_EXTENSION_FIELDS), '/').' FROM/');
+
+		$log = tempnam(sys_get_temp_dir(), 'rest_api_log');
+		$previous = ini_set('error_log', $log);
+		try {
+			$result = $this->update(array('enabled' => false));
+		} finally {
+			ini_set('error_log', $previous);
+		}
+		$logged = file_get_contents($log);
+		unlink($log);
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $result);
+		$this->assertSame('false', $this->extension()['enabled']);
+		$this->assertStringContainsString('rest_api: extension-update saved extension '.self::EXT_100.' but reading it back failed: "SQLSTATE[08006]: simulated database error"', $logged);
 	}
 
 	public function testAnswers500WhenTheSaveFails(): void

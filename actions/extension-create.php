@@ -135,6 +135,8 @@ function do_action($body) {
     $parameters['extension_uuid'] = $extension_uuid;
     $extensions = $database->select($sql, $parameters, 'all');
     if(!is_array($extensions) || !$extensions) {
+        // the extension is saved by now, so the 500 alone would hide it
+        error_log("rest_api: extension-create saved extension ".$extension_uuid." but reading it back failed: ".json_encode(is_array($extensions) ? "no row" : ($database->message["message"] ?? null)));
         return array("error" => "database error", "code" => 500);
     }
     $extension = rest_api_format_extension($extensions[0]);
