@@ -38,4 +38,21 @@ class ExtensionDetailsTest extends ActionTestCase
 
 		$this->assertSame(array('error' => 'extension not found', 'code' => 404), $result);
 	}
+
+	public function testRejectsAnInvalidExtensionUuid(): void
+	{
+		$result = $this->runAction(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension_uuid' => 'abc'));
+
+		$this->assertSame(array('error' => 'invalid extension_uuid', 'code' => 400), $result);
+	}
+
+	// select() returns false on a database error: not a missing extension
+	public function testAnswers500WhenTheDatabaseFails(): void
+	{
+		$this->failSelects();
+
+		$result = $this->runAction(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100'));
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $result);
+	}
 }

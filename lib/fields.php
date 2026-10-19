@@ -50,7 +50,6 @@ const REST_API_EXTENSION_FIELDS = array(
     "follow_me_uuid",
     "enabled",
     "description",
-    "forward_caller_id_uuid",
     "absolute_codec_string",
     "force_ping",
     "follow_me_enabled",

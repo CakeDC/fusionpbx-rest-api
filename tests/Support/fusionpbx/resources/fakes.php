@@ -611,6 +611,8 @@ class database {
 	public $app_uuid;
 	public $user_uuid;
 	public $domain_uuid;
+	// like 5.6.5, the outcome of the last query; "message" holds the PDO error
+	public $message;
 
 	// like FusionPBX: the user and domain come from the parameters, else from the session
 	public function __construct(array $params = array()) {
@@ -641,14 +643,21 @@ class database {
 	// (RestApi\Test\Support\Pgsql, used by the pgsql test suite)
 	public static $pgsql = null;
 
-	// like FusionPBX 5.6.5, a database error returns false (simulated by select_fails)
+	// like FusionPBX 5.6.5, a database error returns false and keeps the error
+	// in message. simulated by select_fails: true for every query, or a regex
+	// for the queries that fail
 	public function select(string $sql, ?array $parameters = array(), string $return_type = 'all') {
-		if (FakeStore::read()['select_fails'] ?? false) {
+		$fails = FakeStore::read()['select_fails'] ?? false;
+		if ($fails === true || (is_string($fails) && preg_match($fails, $sql))) {
+			$this->message = array('message' => 'SQLSTATE[08006]: simulated database error', 'code' => '08006');
 			return false;
 		}
 		if (self::$pgsql) {
-			return self::$pgsql->select($sql, $parameters, $return_type);
+			$result = self::$pgsql->select($sql, $parameters, $return_type);
+			$this->message = $result === false ? array('message' => self::$pgsql->lastError()) : array('message' => 'OK', 'code' => '200');
+			return $result;
 		}
+		$this->message = array('message' => 'OK', 'code' => '200');
 		return fake_sql($sql, $parameters, $return_type);
 	}
 
@@ -695,6 +704,10 @@ class database {
 			$key = rtrim($record[0], 's').'_uuid';
 			$exists = isset($record[1][$key]) && in_array($record[1][$key], array_column($tables['v_'.$record[0]] ?? array(), $key), true);
 			if (permission_exists(rtrim($record[0], 's').($exists ? '_edit' : '_add'))) {
+				// 5.6.5 writes an empty string as NULL
+				$record[1] = array_map(function ($value) {
+					return $value === '' ? null : $value;
+				}, $record[1]);
 				$record[1][$exists ? 'update_user' : 'insert_user'] = $this->user_uuid;
 				$allowed[] = array($record[0], $record[1], $exists ? $key : null);
 			} else {

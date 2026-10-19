@@ -90,6 +90,17 @@ class FakesTest extends TestCase
 		$this->assertSame(array('voicemails'), $state['skipped']);
 	}
 
+	// 5.6.5's save() writes an empty string as NULL
+	public function testSaveStoresAnEmptyStringAsNull(): void
+	{
+		$_SESSION['permissions'] = array('extension_add' => true);
+		$database = \database::new(array('user_uuid' => self::USER));
+
+		$database->save(array('extensions' => array(array('extension' => '100', 'description' => ''))));
+
+		$this->assertSame(array(array('extension' => '100', 'description' => null, 'insert_user' => self::USER)), FakeStore::read()['tables']['v_extensions']);
+	}
+
 	// 5.6.5's save() updates a record whose <singular>_uuid exists, only with
 	// <singular>_edit, and changes only the fields it is given
 	public function testSaveUpdatesAnExistingRecordWithTheEditPermission(): void
@@ -412,7 +423,23 @@ class FakesTest extends TestCase
 			$state['select_fails'] = true;
 		});
 
-		$this->assertFalse((new \database)->select("SELECT u.username FROM v_users u", null, 'all'));
+		$database = new \database;
+
+		$this->assertFalse($database->select("SELECT u.username FROM v_users u", null, 'all'));
+		// 5.6.5 keeps the PDOException's message
+		$this->assertSame('SQLSTATE[08006]: simulated database error', $database->message['message']);
+	}
+
+	public function testSelectFailsOnlyTheQueriesMatchingAPattern(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['select_fails'] = '/^SELECT u\.username /';
+		});
+		$database = new \database;
+
+		$this->assertFalse($database->select("SELECT u.username FROM v_users u", null, 'all'));
+		$this->assertSame(array(), $database->select("SELECT u.user_uuid FROM v_users u", null, 'all'));
+		$this->assertSame('OK', $database->message['message']);
 	}
 
 	// uncorrelated IN (SELECT ...): Postgres hashes the set once per query,

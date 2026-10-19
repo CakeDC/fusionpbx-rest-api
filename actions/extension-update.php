@@ -132,6 +132,8 @@ function do_action($body) {
     $sql = "SELECT ".implode(", ", REST_API_EXTENSION_FIELDS)." FROM v_extensions WHERE extension_uuid = :extension_uuid AND domain_uuid = :domain_uuid";
     $updated = $database->select($sql, $parameters, 'all');
     if(!is_array($updated) || !$updated) {
+        // the change is saved by now, so the 500 alone would hide it
+        error_log("rest_api: extension-update saved extension ".$body->extension_uuid." but reading it back failed: ".json_encode(is_array($updated) ? "no row" : ($database->message["message"] ?? null)));
         return array("error" => "database error", "code" => 500);
     }
     return rest_api_format_extension($updated[0]);

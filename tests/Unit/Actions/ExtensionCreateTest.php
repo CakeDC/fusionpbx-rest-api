@@ -158,4 +158,25 @@ class ExtensionCreateTest extends ActionTestCase
 		$this->assertSame(array('error' => 'error adding extension', 'code' => 500), $this->create(array('extension' => '101')));
 		$this->assertCount(1, $this->state()['tables']['v_extensions']);
 	}
+
+	// the extension is saved by then: the log tells why the 500 came anyway
+	public function testLogsAFailedReadAfterTheSave(): void
+	{
+		$this->failSelects('/^SELECT '.preg_quote(implode(', ', REST_API_EXTENSION_FIELDS), '/').' FROM/');
+
+		$log = tempnam(sys_get_temp_dir(), 'rest_api_log');
+		$previous = ini_set('error_log', $log);
+		try {
+			$result = $this->create(array('extension' => '101'));
+		} finally {
+			ini_set('error_log', $previous);
+		}
+		$logged = file_get_contents($log);
+		unlink($log);
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $result);
+		$this->assertContains('101', array_column($this->state()['tables']['v_extensions'], 'extension'));
+		$this->assertStringContainsString('rest_api: extension-create saved extension ', $logged);
+		$this->assertStringContainsString('but reading it back failed: "SQLSTATE[08006]: simulated database error"', $logged);
+	}
 }
