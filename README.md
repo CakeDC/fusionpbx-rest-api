@@ -6,16 +6,16 @@ Clone a release into FusionPBX's `app/` folder, into a folder called `rest_api`:
 
 ```
 cd /var/www/fusionpbx/app
-git clone --branch 2.0.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
+git clone --branch 2.0.1 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
 ```
 
 Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, App Defaults, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions. App Defaults adds the index on `v_xml_cdr.originating_leg_uuid` that `cdr-search` and `cdr-details` need on PostgreSQL; on a large CDR table it can take a few minutes, without blocking new call records.)
 
-To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout <version>`, e.g. `2.0.0`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) and the [changelog](CHANGELOG.md) first.
+To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout <version>`, e.g. `2.0.1`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) and the [changelog](CHANGELOG.md) first.
 
 # Compatibility
 
-Version 2.0.0 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases), and what changed in each one in the [changelog](CHANGELOG.md).
+Version 2.0.1 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases), and what changed in each one in the [changelog](CHANGELOG.md).
 
 # Features
 
@@ -135,6 +135,9 @@ Lookups never return records of domains the user can't act on: they answer 404 a
 Other FusionPBX apps can expose actions through an `app_api.php` file (call them with `"app": "<app name>"`). Each such action file must declare the FusionPBX permissions it needs, for example `$required_permissions = array("my_app_view");`, or `array()` for none. Actions that don't declare them aren't run. `do_action()` receives the request body and, as an optional second argument, the context: `domain_explicit`, `cross_domain` and `user_domain_uuid`. Do all the work inside `do_action()`: top-level code in the action file runs before `rest.php` checks `$required_permissions`.
 
 ## Upgrading from earlier versions
+
+From 2.0.0 to 2.0.1:
+- `call-transfer` and `call-transfer-attended` need `rest_api_call_control` instead of `call_active_transfer` (which no group could hold, so they always answered `403`). The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`. Grant them to the integration's user's group if it should transfer calls.
 
 From 1.0.0 to 2.0.0:
 - `originate` calls `destination_a` first, as documented (it used to call `destination_b` first), and answers `201` with the call (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`) instead of `{"success": ..., "call_uuid": ...}`. A call FreeSWITCH can't place now answers `500` instead of `200` with `success: false`.

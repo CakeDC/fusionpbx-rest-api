@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-19
+
+Targets FusionPBX **5.6.5**. Bug fixes only; no Upgrade step beyond the usual ones is needed.
+
 ### Fixed
 
 - `call-transfer` and `call-transfer-attended` answered `403` to every key: they required `call_active_transfer`, which FusionPBX 5.6.5 doesn't define, so no group could hold it. They now need `rest_api_call_control`, like `call-answer`, `call-hold` and `call-resume`. The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`, as `originate` does: it dials any number the domain routes, outbound ones included.
@@ -85,5 +89,7 @@ First release. Targets FusionPBX **5.6.5**.
 - Responses only contain documented columns. `extension-create` returns the SIP password only to users with `extension_password`.
 - **Breaking** (from the AccelerateNetworks code): existing keys stop working until a superadmin binds each one to a user.
 
+[Unreleased]: https://github.com/CakeDC/fusionpbx-rest-api/compare/2.0.1...HEAD
+[2.0.1]: https://github.com/CakeDC/fusionpbx-rest-api/compare/2.0.0...2.0.1
 [2.0.0]: https://github.com/CakeDC/fusionpbx-rest-api/compare/1.0.0...2.0.0
 [1.0.0]: https://github.com/CakeDC/fusionpbx-rest-api/releases/tag/1.0.0
