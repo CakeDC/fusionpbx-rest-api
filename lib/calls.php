@@ -16,7 +16,10 @@ function rest_api_call_state($callstate, $bridged) {
 // the channel of a call in the domain, as "uuid_dump <uuid> json" gives it,
 // or the response to answer: 400 for a malformed uuid, 404 when the channel
 // doesn't exist or belongs to another domain (a call_uuid is global to
-// FreeSWITCH), 500 when the event socket fails
+// FreeSWITCH), 500 when the event socket or the database fails.
+// the dialplan sets domain_uuid on the caller's leg but exports only
+// domain_name, so a leg without domain_uuid (the extension called) is
+// checked by its domain_name
 function rest_api_call($call_uuid, $domain_uuid) {
     if(!is_uuid($call_uuid)) {
         return array("error" => "invalid call_uuid", "code" => 400);
@@ -30,8 +33,24 @@ function rest_api_call($call_uuid, $domain_uuid) {
         error_log("rest_api: ".$command." failed: ".json_encode($dump));
         return array("error" => "event socket error", "code" => 500);
     }
-    if(strtolower((string)($dump["variable_domain_uuid"] ?? "")) !== strtolower((string)$domain_uuid)) {
-        return array("error" => "call not found", "code" => 404);
+    $channel_domain_uuid = strtolower((string)($dump["variable_domain_uuid"] ?? ""));
+    if($channel_domain_uuid !== "") {
+        if($channel_domain_uuid !== strtolower((string)$domain_uuid)) {
+            return array("error" => "call not found", "code" => 404);
+        }
+    } else {
+        $channel_domain_name = strtolower((string)($dump["variable_domain_name"] ?? ""));
+        if($channel_domain_name === "") {
+            return array("error" => "call not found", "code" => 404);
+        }
+        // FusionPBX's select() returns false on a database error
+        $domain_name = (new database)->select("SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid", array("domain_uuid" => $domain_uuid), 'column');
+        if($domain_name === false) {
+            return array("error" => "database error", "code" => 500);
+        }
+        if($domain_name === null || strtolower((string)$domain_name) !== $channel_domain_name) {
+            return array("error" => "call not found", "code" => 404);
+        }
     }
     // commands use the uuid checked here, not one FreeSWITCH reports back
     $dump["Unique-ID"] = strtolower($call_uuid);

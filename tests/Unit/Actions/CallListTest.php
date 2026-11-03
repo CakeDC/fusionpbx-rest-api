@@ -24,6 +24,12 @@ class CallListTest extends ActionTestCase
 
 	private static function channel(string $uuid, array $fields): array
 	{
+		// a phone's leg is named after its SIP user, which is its presence;
+		// a carrier's after the caller
+		if (!isset($fields['name'])) {
+			$presence_user = explode('@', $fields['presence_id'] ?? '101@tenant1.example.com', 2)[0];
+			$fields['name'] = $presence_user !== '' ? 'sofia/internal/'.$presence_user.'@tenant1.example.com' : 'sofia/external/'.($fields['cid_num'] ?? '101').'@carrier.example.com';
+		}
 		return $fields + array(
 			'uuid' => $uuid, 'direction' => 'inbound', 'name' => 'sofia/internal/101@tenant1.example.com', 'state' => 'CS_EXECUTE',
 			'cid_name' => 'Ana', 'cid_num' => '101', 'dest' => '102', 'application' => '', 'context' => 'tenant1.example.com',
@@ -160,6 +166,70 @@ class CallListTest extends ActionTestCase
 			return array($call['call_uuid'], $call['state']);
 		}, $this->list(array('extension' => '101'))['data']));
 		$this->assertSame(array('b1'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'));
+	}
+
+	// the leg of the extension called may have no context or presence of
+	// the domain: it is in the domain of the leg it is paired with, and is
+	// the extension's by its SIP user
+	public function testListsTheCalledExtensionByItsLegWithoutADomainOfItsOwn(): void
+	{
+		$this->respond(
+			array(
+				self::channel('a1', array('cid_num' => '101', 'dest' => '102', 'presence_id' => '101@tenant1.example.com')),
+				self::channel('b1', array('direction' => 'outbound', 'name' => 'sofia/internal/102@192.0.2.10:5060', 'context' => 'default', 'cid_num' => '101', 'dest' => '102', 'presence_id' => '')),
+			),
+			array(array('uuid' => 'a1', 'b_uuid' => 'b1'))
+		);
+
+		$this->assertSame(array(array('a1', 'bridged')), array_map(function ($call) {
+			return array($call['call_uuid'], $call['state']);
+		}, $this->list()['data']));
+		$this->assertSame(array('a1'), array_column($this->list(array('extension' => '101'))['data'], 'call_uuid'));
+		$this->assertSame(array(array('b1', 'bridged')), array_map(function ($call) {
+			return array($call['call_uuid'], $call['state']);
+		}, $this->list(array('extension' => '102'))['data']));
+	}
+
+	// the leg of the extension called may carry the caller's presence
+	public function testListsTheCalledExtensionByItsSipUser(): void
+	{
+		$this->respond(
+			array(
+				self::channel('a1', array('cid_num' => '101', 'dest' => '102', 'presence_id' => '101@tenant1.example.com')),
+				self::channel('b1', array('direction' => 'outbound', 'name' => 'sofia/internal/102@192.0.2.10:5060', 'cid_num' => '101', 'dest' => '102', 'presence_id' => '101@tenant1.example.com')),
+			),
+			array(array('uuid' => 'a1', 'b_uuid' => 'b1'))
+		);
+
+		$this->assertSame(array('b1'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'));
+	}
+
+	// a leg without a domain is not listed for the domain of a call it isn't in
+	public function testDoesntListALegWithoutADomainPairedWithAnotherDomain(): void
+	{
+		$this->respond(
+			array(
+				self::channel('x1', array('context' => 'tenant2.example.com', 'cid_num' => '201', 'dest' => '102', 'presence_id' => '201@tenant2.example.com')),
+				self::channel('x2', array('direction' => 'outbound', 'name' => 'sofia/internal/102@192.0.2.10:5060', 'context' => 'default', 'cid_num' => '201', 'dest' => '102', 'presence_id' => '')),
+				self::channel('x3', array('name' => 'sofia/internal/102@192.0.2.10:5060', 'context' => 'default', 'cid_num' => '102', 'dest' => '5550000', 'presence_id' => '')),
+			),
+			array(array('uuid' => 'x1', 'b_uuid' => 'x2'))
+		);
+
+		$this->assertSame(array('data' => array()), $this->list());
+		$this->assertSame(array('data' => array()), $this->list(array('extension' => '102')));
+	}
+
+	// a carrier's leg named like an extension isn't the extension's phone
+	public function testDoesntTakeACarriersLegForAnExtension(): void
+	{
+		$this->respond(
+			array(
+				self::channel('a1', array('name' => 'loopback/102-a', 'cid_num' => '+15550001111', 'dest' => '5551234', 'context' => 'public', 'presence_id' => '5551234@tenant1.example.com')),
+			)
+		);
+
+		$this->assertSame(array('data' => array()), $this->list(array('extension' => '102')));
 	}
 
 	// a user can have several extensions; each call is listed once

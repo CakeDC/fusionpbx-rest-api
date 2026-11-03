@@ -7,9 +7,13 @@ $required_permissions = array("call_active_view");
 // a channel's domain is decided as FusionPBX's active calls page does: its
 // context (the part after "@" if any) unless that is "public" or "default",
 // else the domain of its presence_id.
-// call actions act on the leg they get, so a call is listed by the leg of the
-// extensions asked for (the one whose presence is theirs), else by its first
-// leg
+// a leg whose domain can't be decided so (the leg of the extension called,
+// without a context or presence of the domain) is in the domain of the leg
+// "show calls" pairs it with.
+// call actions act on the leg they get (call-transfer moves the other party,
+// call-transfer-attended consults from it), so a call is listed by the leg of
+// the extensions asked for (the one whose presence or SIP user is theirs),
+// else by its first leg
 function do_action($body) {
     $extensions = null;
     if(isset($body->extension)) {
@@ -64,23 +68,39 @@ function do_action($body) {
     // the leg each call is listed by, and how well it fits (2: the
     // extension's presence, 1: the extension called or was called, 0: the
     // call's first leg without extensions)
-    $calls = array();
+    $domains = array();
     foreach($replies["channels"]["rows"] ?? array() as $channel) {
         $context = (string)($channel["context"] ?? "");
         $presence_id = (string)($channel["presence_id"] ?? "");
         if($context !== "" && $context !== "public" && $context !== "default") {
-            $channel_domain = strpos($context, "@") !== false ? explode("@", $context, 2)[1] : $context;
+            $domains[$channel["uuid"]] = strpos($context, "@") !== false ? explode("@", $context, 2)[1] : $context;
         } else {
-            $channel_domain = strpos($presence_id, "@") !== false ? explode("@", $presence_id, 2)[1] : null;
+            $domains[$channel["uuid"]] = strpos($presence_id, "@") !== false ? explode("@", $presence_id, 2)[1] : null;
         }
+    }
+    // a leg with no domain of its own takes its call's: the first leg's, or
+    // that of a leg paired with it
+    $paired_domains = array();
+    foreach($call_of as $b_uuid => $a_uuid) {
+        if(isset($domains[$b_uuid]) && !isset($paired_domains[$a_uuid])) {
+            $paired_domains[$a_uuid] = $domains[$b_uuid];
+        }
+    }
+    $calls = array();
+    foreach($replies["channels"]["rows"] ?? array() as $channel) {
+        $uuid = $channel["uuid"];
+        $key = $call_of[$uuid] ?? $uuid;
+        $channel_domain = $domains[$uuid] ?? $domains[$key] ?? $paired_domains[$key] ?? null;
         if($channel_domain !== $domain_name) {
             continue;
         }
-        $uuid = $channel["uuid"];
-        $key = $call_of[$uuid] ?? $uuid;
+        $presence_id = (string)($channel["presence_id"] ?? "");
+        // a phone's leg is named after its SIP user: sofia/<profile>/<user>@<host>
+        $name = (string)($channel["name"] ?? "");
+        $sip_user = strpos($name, "sofia/") === 0 ? explode("@", (string)(explode("/", $name, 3)[2] ?? ""), 2)[0] : null;
         if($extensions === null) {
             $fit = $key === $uuid ? 1 : 0;
-        } elseif(in_array(explode("@", $presence_id, 2)[0], $extensions, true)) {
+        } elseif(in_array(explode("@", $presence_id, 2)[0], $extensions, true) || ($sip_user !== null && in_array($sip_user, $extensions, true))) {
             $fit = 2;
         } elseif(in_array((string)($channel["cid_num"] ?? ""), $extensions, true) || in_array((string)($channel["dest"] ?? ""), $extensions, true)) {
             $fit = 1;

@@ -93,6 +93,45 @@ class CallAnswerTest extends ActionTestCase
 		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
 	}
 
+	// the dialplan sets domain_uuid on the caller's leg and exports only
+	// domain_name: the leg of the extension called is checked by its name
+	public function testChecksALegWithoutDomainUuidByItsDomainName(): void
+	{
+		$leg = array('Unique-ID' => self::CALL, 'Channel-Call-State' => 'RINGING', 'variable_domain_name' => 'TENANT1.example.com');
+		$this->replies(array(json_encode($leg), json_encode(array('Channel-Call-State' => 'ACTIVE') + $leg)));
+
+		$this->assertSame('answered', $this->answer()['state']);
+		$this->assertSame(array(self::DUMP, self::ANSWER, self::DUMP), $this->state()['esl_commands']);
+	}
+
+	public function testAnswersNotFoundForALegOfAnotherDomainName(): void
+	{
+		foreach (array('tenant2.example.com', 'tenant1.example.com.evil.com') as $domain_name) {
+			$this->replies(array(json_encode(array('Unique-ID' => self::CALL, 'Channel-Call-State' => 'RINGING', 'variable_domain_name' => $domain_name))));
+
+			$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->answer(), $domain_name);
+		}
+		$this->assertNotContains(self::ANSWER, $this->state()['esl_commands']);
+	}
+
+	// domain_uuid decides when the leg has it
+	public function testAnswersNotFoundForALegOfAnotherDomainUuidWithTheDomainName(): void
+	{
+		$this->replies(array(self::dump(array('variable_domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002', 'variable_domain_name' => 'tenant1.example.com'))));
+
+		$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->answer());
+		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
+	}
+
+	public function testAnswers500WhenTheDomainNameCantBeRead(): void
+	{
+		$this->replies(array(json_encode(array('Unique-ID' => self::CALL, 'Channel-Call-State' => 'RINGING', 'variable_domain_name' => 'tenant1.example.com'))));
+		$this->failSelects();
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $this->answer());
+		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
+	}
+
 	public function testAnswersNotFoundForAnUnknownCall(): void
 	{
 		$this->replies(array("-ERR No such channel!\n"));

@@ -14,6 +14,16 @@ class OriginateTest extends ActionTestCase
 		return 'originate';
 	}
 
+	protected function tables(): array
+	{
+		return parent::tables() + array(
+			'v_extensions' => array(
+				array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000100', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '100', 'number_alias' => '1100', 'user_context' => 'tenant1.example.com'),
+				array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000200', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002', 'extension' => '200', 'number_alias' => '', 'user_context' => 'tenant2.example.com'),
+			),
+		);
+	}
+
 	private function body(array $overrides = array()): array
 	{
 		return array_merge(array(
@@ -27,6 +37,7 @@ class OriginateTest extends ActionTestCase
 	// the stand-in's first uuid()
 	private const CALL = '00000000-0000-4000-8000-000000000001';
 	private const LEG_VARIABLES = 'domain_uuid=aaaaaaaa-0000-4000-8000-000000000001,domain_name=tenant1.example.com,ignore_early_media=true,originate_timeout=30,effective_caller_id_number=5551000';
+	private const LEG_A_VARIABLES = 'origination_uuid='.self::CALL.','.self::LEG_VARIABLES.',origination_caller_id_number=5551000';
 
 	protected function setUp(): void
 	{
@@ -41,17 +52,53 @@ class OriginateTest extends ActionTestCase
 	}
 
 	// destination_a (the agent's own extension in click-to-call) rings first;
-	// destination_b is only called once it answers
+	// destination_b is only called once it answers. the extension is called
+	// directly: a loopback bows out once bridged, and its uuid with it
 	public function testCallsDestinationAFirstThenBridgesDestinationB(): void
 	{
 		$result = $this->runAction($this->body());
 
 		$this->assertSame(array(
-			"api originate {origination_uuid=".self::CALL.",".self::LEG_VARIABLES."}loopback/100/tenant1.example.com"
+			"api originate {".self::LEG_A_VARIABLES."}user/100@tenant1.example.com"
 			." '&bridge({".self::LEG_VARIABLES."}loopback/101/tenant1.example.com)'",
 			'api uuid_dump '.self::CALL.' json',
 		), $this->state()['esl_commands']);
 		$this->assertSame(array('call_uuid' => self::CALL, 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'state' => 'answered', 'caller_id_number' => '5551000', 'destination_number' => '101', 'consulting' => null, 'code' => 201), $result);
+	}
+
+	public function testCallsAnExtensionByItsAlias(): void
+	{
+		$this->runAction($this->body(array('destination_a' => '1100')));
+
+		$this->assertStringStartsWith('api originate {'.self::LEG_A_VARIABLES.'}user/100@tenant1.example.com ', $this->state()['esl_commands'][0]);
+	}
+
+	public static function otherNumbers(): array
+	{
+		return array(
+			'external number' => array('+15550001111'),
+			'extension of another domain' => array('200'),
+		);
+	}
+
+	// any other number goes through the dialplan, on a loopback that stays
+	// so its uuid does too
+	#[DataProvider('otherNumbers')]
+	public function testCallsAnotherNumberThroughALoopbackThatDoesntBowOut(string $number): void
+	{
+		$this->runAction($this->body(array('destination_a' => $number)));
+
+		$this->assertStringStartsWith('api originate {'.self::LEG_A_VARIABLES.',loopback_bowout=false}loopback/'.$number.'/tenant1.example.com ', $this->state()['esl_commands'][0]);
+	}
+
+	public function testAnswers500WhenTheExtensionCantBeRead(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['select_fails'] = '/v_extensions/';
+		});
+
+		$this->assertSame(array('error' => 'database error', 'code' => 500), $this->runAction($this->body()));
+		$this->assertSame(array(), $this->state()['esl_commands']);
 	}
 
 	// the returned call_uuid is set up front and carries the domain, so
@@ -70,7 +117,7 @@ class OriginateTest extends ActionTestCase
 		$this->runAction($this->body(array('caller_id_name' => 'Front Desk, Inc}')));
 
 		$this->assertStringContainsString(
-			'effective_caller_id_number=5551000,effective_caller_id_name=Front%20Desk%2C%20Inc%7D}loopback/100/',
+			'effective_caller_id_number=5551000,effective_caller_id_name=Front%20Desk%2C%20Inc%7D,origination_caller_id_number=5551000,origination_caller_id_name=Front%20Desk%2C%20Inc%7D}user/100@',
 			$this->state()['esl_commands'][0]
 		);
 	}
