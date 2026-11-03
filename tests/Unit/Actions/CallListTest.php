@@ -232,6 +232,61 @@ class CallListTest extends ActionTestCase
 		$this->assertSame(array('data' => array()), $this->list(array('extension' => '102')));
 	}
 
+	// "show calls" pairs the legs only once bridged; while the call rings,
+	// the leg ringing the extension names the caller's leg in its call_uuid
+	public function testListsARingingCallOnce(): void
+	{
+		$this->respond(array(
+			self::channel('a1', array('call_uuid' => 'a1', 'callstate' => 'RING_WAIT', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '103@tenant1.example.com')),
+			self::channel('b1', array('call_uuid' => 'a1', 'direction' => 'outbound', 'callstate' => 'RINGING', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '101@tenant1.example.com')),
+		));
+
+		$this->assertSame(array(array('a1', 'ringing')), array_map(function ($call) {
+			return array($call['call_uuid'], $call['state']);
+		}, $this->list()['data']));
+		$this->assertSame(array('b1'), array_column($this->list(array('extension' => '101'))['data'], 'call_uuid'));
+		$this->assertSame(array('a1'), array_column($this->list(array('extension' => '103'))['data'], 'call_uuid'));
+		// both extensions in the call: still once
+		$this->assertSame(array('a1'), array_column($this->list(array('extension' => array('103', '101')))['data'], 'call_uuid'));
+	}
+
+	// the ringing leg of the extension called may have no domain of its own,
+	// and a ring group rings several at once
+	public function testListsTheRingingLegsOfARingGroupOnce(): void
+	{
+		$this->respond(array(
+			self::channel('a1', array('callstate' => 'RING_WAIT', 'cid_num' => '+15550001111', 'dest' => '600', 'presence_id' => '')),
+			self::channel('b1', array('call_uuid' => 'a1', 'direction' => 'outbound', 'name' => 'sofia/internal/101@192.0.2.10:5060', 'context' => 'default', 'callstate' => 'RINGING', 'cid_num' => '+15550001111', 'dest' => '101', 'presence_id' => '')),
+			self::channel('b2', array('call_uuid' => 'a1', 'direction' => 'outbound', 'name' => 'sofia/internal/102@192.0.2.11:5060', 'context' => 'default', 'callstate' => 'RINGING', 'cid_num' => '+15550001111', 'dest' => '102', 'presence_id' => '')),
+		));
+
+		$this->assertSame(array('a1'), array_column($this->list()['data'], 'call_uuid'));
+		$this->assertSame(array('b2'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'));
+	}
+
+	// a call_uuid naming a channel that is gone, or the channel itself,
+	// doesn't join legs
+	public function testListsALegWhoseCallUuidIsNoLiveLegByItself(): void
+	{
+		$this->respond(array(
+			self::channel('a1', array('call_uuid' => 'gone')),
+			self::channel('a2', array('call_uuid' => 'a2')),
+		));
+
+		$this->assertSame(array('a1', 'a2'), array_column($this->list()['data'], 'call_uuid'));
+	}
+
+	// a ringing leg placed by a call of another domain isn't listed
+	public function testDoesntListARingingLegWithoutADomainPlacedByAnotherDomain(): void
+	{
+		$this->respond(array(
+			self::channel('x1', array('context' => 'tenant2.example.com', 'callstate' => 'RING_WAIT', 'cid_num' => '201', 'dest' => '101', 'presence_id' => '201@tenant2.example.com')),
+			self::channel('x2', array('call_uuid' => 'x1', 'direction' => 'outbound', 'name' => 'sofia/internal/101@192.0.2.10:5060', 'context' => 'default', 'callstate' => 'RINGING', 'cid_num' => '201', 'dest' => '101', 'presence_id' => '')),
+		));
+
+		$this->assertSame(array('data' => array()), $this->list(array('extension' => '101')));
+	}
+
 	// a user can have several extensions; each call is listed once
 	public function testListsTheCallsOfSeveralExtensions(): void
 	{

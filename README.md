@@ -138,6 +138,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 From 2.0.1 to 2.0.2:
 - `call-list` with `extension` lists a call between two extensions by the leg of the extension asked for also when that leg has no context or presence of the domain (it used to list the caller's leg for both extensions, so `call-transfer` moved the agent instead of the caller, and `call-transfer-attended` consulted from the caller's phone). The call actions accept a leg that has only the `domain_name` variable.
+- `call-list` lists a ringing call once (it used to list it once per leg until it was answered).
 - `originate` calls an extension of the domain given as `destination_a` directly (`user/`) instead of through a loopback, and any other `destination_a` through a loopback that doesn't bow out: the `call_uuid` it returned used to disappear once the call was answered, so the call actions answered `404` for it. destination_a's phone now shows `caller_id_number` (and `caller_id_name`) too.
 
 From 2.0.0 to 2.0.1:
@@ -454,7 +455,7 @@ Put an answered call on hold (`uuid_hold`, never toggled), so the other party he
 
 List the active calls of a domain from FreeSWITCH (`show channels`), one item per call: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number", "consulting"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id. A leg that has neither (often the leg of the extension called) is in the domain of the leg `show calls` pairs it with.
 
-The legs `show calls` pairs are one call (a ring group pairs its first leg with every leg it rings). The call actions act on the leg they get (holding a leg plays the music to the other one, `call-transfer` transfers the other one), so a call is listed by one of its legs, the one to pass as `call_uuid`: with `extension`, the leg of the extension's own phone (its presence or SIP user, `sofia/<profile>/<extension>@...`, is one of the extensions), else a leg where one of them called or was called; without it, the call's first leg. A call is listed once even when several of the extensions are in it.
+The legs `show calls` pairs are one call (a ring group pairs its first leg with every leg it rings). `show calls` only pairs them once they are bridged: while a call rings, a leg is one call with the leg its `call_uuid` column names (the leg that placed it), so a ringing call is listed once too. The call actions act on the leg they get (holding a leg plays the music to the other one, `call-transfer` transfers the other one), so a call is listed by one of its legs, the one to pass as `call_uuid`: with `extension`, the leg of the extension's own phone (its presence or SIP user, `sofia/<profile>/<extension>@...`, is one of the extensions), else a leg where one of them called or was called; without it, the call's first leg. A call is listed once even when several of the extensions are in it.
 
 `state` comes from the channel's call state: `ringing` (`DOWN`, `DIALING`, `RINGING`, `EARLY`, `RING_WAIT`, or any state FreeSWITCH adds later), `answered` (`ACTIVE`, `UNHELD`), `held` (`HELD`), `ended` (`HANGUP`), and `bridged` for an answered channel that `show calls` pairs with another leg.
 

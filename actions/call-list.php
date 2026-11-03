@@ -3,7 +3,8 @@ $required_params = array();
 $required_permissions = array("call_active_view");
 
 // the active calls of a domain, from FreeSWITCH's "show channels", one item
-// per call (the legs "show calls" pairs), optionally those of some extensions.
+// per call (the legs "show calls" pairs, and while it rings a leg with the
+// leg that placed it), optionally those of some extensions.
 // a channel's domain is decided as FusionPBX's active calls page does: its
 // context (the part after "@" if any) unless that is "public" or "default",
 // else the domain of its presence_id.
@@ -62,6 +63,18 @@ function do_action($body) {
     $live = array();
     foreach($replies["channels"]["rows"] ?? array() as $channel) {
         $live[strtolower((string)($channel["uuid"] ?? ""))] = true;
+    }
+
+    // "show calls" only pairs legs once they are bridged. a leg that rings
+    // (placed by a bridge or an originate) names the leg that placed it in
+    // its call_uuid, so it is one call with that leg meanwhile
+    foreach($replies["channels"]["rows"] ?? array() as $channel) {
+        $uuid = (string)($channel["uuid"] ?? "");
+        $placed_by = strtolower((string)($channel["call_uuid"] ?? ""));
+        if(isset($call_of[$uuid]) || $placed_by === "" || $placed_by === strtolower($uuid) || !isset($live[$placed_by])) {
+            continue;
+        }
+        $call_of[$uuid] = $call_of[$placed_by] ?? $placed_by;
     }
 
     // the channels of the domain by call, in the order they are listed:
