@@ -512,7 +512,7 @@ List the call center agents of a domain, sorted by agent name: `{"data": [...]}`
 
 Set the call center state of a user's agent in FreeSWITCH's mod_callcenter (`callcenter_config agent set state`), for example `Waiting`, and return `{"user_uuid", "status", "state", "wrap_up_until"}` read live as `callcenter-agent-status` does. The state only lives in mod_callcenter; FusionPBX keeps no copy of it. A user with several agents in the domain is answered for the first by agent name.
 
-A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead.
 
 ## `callcenter-agent-status`
 | Parameter     | Required | Description |
@@ -525,7 +525,7 @@ Read, or set, the call center status of a user's agent: `{"user_uuid", "status",
 
 Setting runs the commands of FusionPBX's agent status page (`callcenter_config agent set status`, and `agent set state ... 'Waiting'` after `Available` or `Logged Out`) and saves the status on the agent, so FreeSWITCH keeps it after a restart. It doesn't change the user's own status (`user_status`) or the BLF lamps the page also updates.
 
-A user without an agent in the domain returns `404 {"error": "agent not found"}`, an unknown status or malformed uuid returns `400`, and setting without `call_center_agent_edit` returns `403`. When the event socket can't be reached or FreeSWITCH refuses a command, it returns `500 {"error": "event socket error"}` and logs the reason; a refused status isn't saved.
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, an unknown status or malformed uuid returns `400`, and setting without `call_center_agent_edit` returns `403`. When the event socket can't be reached or FreeSWITCH refuses a command, it returns `500 {"error": "event socket error"}` and logs the reason; a refused status isn't saved. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead.
 
 ## `callcenter-queue-list`
 | Parameter     | Required | Description |
@@ -540,7 +540,7 @@ List the call center queues of a domain, sorted by extension: `{"data": [...]}`,
 | `domain_uuid`            | no  | Domain to act on. Defaults to the key user's domain |
 | `call_center_queue_uuid` | yes | Queue to look at |
 
-Live counts of a call center queue, read from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config queue list members|agents <extension>@<domain>`, as FusionPBX's Active Call Center page does): `call_center_queue_uuid`, `waiting_calls` (calls waiting for an agent, member state `Waiting`), `longest_wait_seconds` (how long the caller who has waited longest has been waiting, from its `joined_epoch`; `0` when nobody waits), `member_count` (every call in the queue, waiting or with an agent), `agent_count` (agents assigned to the queue, whatever their status) and `agents_available` (agents whose status is `Available` or `Available (On Demand)` and whose state is `Waiting`). A queue that doesn't exist or belongs to another domain returns `404 {"error": "queue not found"}`, and a malformed uuid returns `400 {"error": "invalid call_center_queue_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason.
+Live counts of a call center queue, read from FreeSWITCH's mod_callcenter through the event socket (`callcenter_config queue list members|agents <extension>@<domain>`, as FusionPBX's Active Call Center page does): `call_center_queue_uuid`, `waiting_calls` (calls waiting for an agent, member state `Waiting`), `longest_wait_seconds` (how long the caller who has waited longest has been waiting, from its `joined_epoch`; `0` when nobody waits), `member_count` (every call in the queue, waiting or with an agent), `agent_count` (agents assigned to the queue, whatever their status) and `agents_available` (agents whose status is `Available` or `Available (On Demand)` and whose state is `Waiting`). A queue that doesn't exist or belongs to another domain returns `404 {"error": "queue not found"}`, and a malformed uuid returns `400 {"error": "invalid call_center_queue_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead.
 
 ## `cdr-search`
 | Parameter        | Required | Description |

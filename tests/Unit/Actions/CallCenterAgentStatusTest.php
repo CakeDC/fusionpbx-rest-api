@@ -260,6 +260,23 @@ class CallCenterAgentStatusTest extends ActionTestCase
 		$this->assertSame('Logged Out', $this->savedStatus());
 	}
 
+	// what mod_event_socket answers when FreeSWITCH runs without mod_callcenter
+	public function testAnswers500WhenModCallcenterIsNotLoaded(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses'][self::LIST] = "-ERR callcenter_config Command not found!\n";
+			$state['esl_response'] = "-ERR callcenter_config Command not found!\n";
+		});
+
+		foreach (array(array(), array('status' => 'On Break')) as $fields) {
+			list($result, $logged) = $this->agentStatusLogged($fields);
+
+			$this->assertSame(array('error' => 'mod_callcenter not loaded', 'code' => 500), $result, json_encode($fields));
+			$this->assertStringContainsString('-ERR callcenter_config Command not found!', $logged);
+		}
+		$this->assertSame('Logged Out', $this->savedStatus());
+	}
+
 	public function testAnswers500WhenTheEventSocketIsUnavailable(): void
 	{
 		\FakeStore::update(function (&$state) {

@@ -29,12 +29,15 @@ function do_action($body) {
         return array("error" => "invalid queue extension", "code" => 500);
     }
 
-    $members = parse_fs("api callcenter_config queue list members ".$name);
-    $agents = isset($members["error"]) ? $members : parse_fs("api callcenter_config queue list agents ".$name);
-    if(isset($members["error"]) || isset($agents["error"])) {
-        error_log("rest_api: callcenter_config for ".$name." failed: ".json_encode(isset($members["error"]) ? $members : $agents));
-        return array("error" => "event socket error", "code" => 500);
+    $lists = array();
+    foreach(array("members", "agents") as $list) {
+        $command = "api callcenter_config queue list ".$list." ".$name;
+        $lists[$list] = parse_fs($command);
+        if(isset($lists[$list]["error"])) {
+            return rest_api_call_center_error($command, $lists[$list]);
+        }
     }
+    list($members, $agents) = array($lists["members"], $lists["agents"]);
 
     // members are every call in the queue; waiting ones have no agent yet.
     // FreeSWITCH's clock may be ahead of this host's

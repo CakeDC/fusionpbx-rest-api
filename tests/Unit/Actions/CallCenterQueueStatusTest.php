@@ -170,10 +170,25 @@ class CallCenterQueueStatusTest extends ActionTestCase
 		list($result, $logged) = $this->queueStatusLogged();
 
 		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
-		$this->assertStringContainsString('callcenter_config for 800@tenant1.example.com failed', $logged);
+		$this->assertStringContainsString(self::MEMBERS.' failed', $logged);
 	}
 
 	public function testAnswers500WhenFreeswitchRejectsTheCommand(): void
+	{
+		$this->respond(array(), array());
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses'][self::AGENTS] = "-ERR Invalid!\n";
+		});
+
+		list($result, $logged) = $this->queueStatusLogged();
+
+		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
+		$this->assertStringContainsString(self::AGENTS.' failed', $logged);
+		$this->assertStringContainsString('-ERR Invalid!', $logged);
+	}
+
+	// what mod_event_socket answers when FreeSWITCH runs without mod_callcenter
+	public function testAnswers500WhenModCallcenterIsNotLoaded(): void
 	{
 		\FakeStore::update(function (&$state) {
 			$state['esl_response'] = "-ERR callcenter_config Command not found!\n";
@@ -181,8 +196,9 @@ class CallCenterQueueStatusTest extends ActionTestCase
 
 		list($result, $logged) = $this->queueStatusLogged();
 
-		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
+		$this->assertSame(array('error' => 'mod_callcenter not loaded', 'code' => 500), $result);
 		$this->assertStringContainsString('-ERR callcenter_config Command not found!', $logged);
+		$this->assertSame(array(self::MEMBERS), $this->state()['esl_commands']);
 	}
 
 	public function testAnswers500WhenTheDatabaseFails(): void

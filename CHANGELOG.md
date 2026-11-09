@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `callcenter-queue-status`, `callcenter-agent-status` and `callcenter-agent-state` answer `500` `{"error": "mod_callcenter not loaded"}` instead of `event socket error` when FreeSWITCH runs without mod_callcenter (`-ERR callcenter_config Command not found!`), so a missing module can be told apart from an event socket that can't be reached. The log line of `callcenter-queue-status` now names the failed command.
+
 ## [2.0.1] - 2026-10-19
 
 Targets FusionPBX **5.6.5**. Bug fixes only; no Upgrade step beyond the usual ones is needed.
