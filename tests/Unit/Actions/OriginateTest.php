@@ -73,6 +73,32 @@ class OriginateTest extends ActionTestCase
 		$this->assertStringStartsWith('api originate {'.self::LEG_A_VARIABLES.'}user/100@tenant1.example.com ', $this->state()['esl_commands'][0]);
 	}
 
+	// another extension's alias may equal the number: the extension whose own
+	// number it is is called, whichever row comes first
+	public function testPrefersTheExtensionOverAnotherExtensionsAlias(): void
+	{
+		FakeStore::update(function (&$state) {
+			array_unshift($state['tables']['v_extensions'], array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000300', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => '300', 'number_alias' => '100', 'user_context' => 'tenant1.example.com'));
+		});
+
+		$this->runAction($this->body());
+
+		$this->assertStringStartsWith('api originate {'.self::LEG_A_VARIABLES.'}user/100@tenant1.example.com ', $this->state()['esl_commands'][0]);
+	}
+
+	// an extension that isn't a dial number can't go into the dial string:
+	// the number is called through the dialplan
+	public function testCallsANonNumericExtensionThroughALoopback(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_extensions'][] = array('extension_uuid' => 'eeeeeeee-0000-4000-8000-000000000150', 'domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000001', 'extension' => 'reception', 'number_alias' => '150', 'user_context' => 'tenant1.example.com');
+		});
+
+		$this->runAction($this->body(array('destination_a' => '150')));
+
+		$this->assertStringStartsWith('api originate {'.self::LEG_A_VARIABLES.',loopback_bowout=false}loopback/150/tenant1.example.com ', $this->state()['esl_commands'][0]);
+	}
+
 	public static function otherNumbers(): array
 	{
 		return array(

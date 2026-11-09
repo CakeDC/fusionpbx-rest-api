@@ -128,6 +128,26 @@ class CallTransferAttendedTest extends ActionTestCase
 		), $this->commands());
 	}
 
+	// the agent was called: the agent's leg (the one call-list gives for the
+	// agent's extension) has only the domain_name the dialplan exports
+	public function testConsultsFromTheLegOfTheAgentCalled(): void
+	{
+		$this->replies(array(self::agent(array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant1.example.com'))));
+
+		$result = $this->transfer('consult', array('target' => '102'));
+
+		$this->assertSame(array('held', '102'), array($result['state'], $result['consulting']));
+		$this->assertContains('api uuid_broadcast '.self::AGENT.' att_xfer::{origination_uuid='.self::NEW_CONSULT.'}loopback/102/tenant1.example.com aleg', $this->commands());
+	}
+
+	public function testDoesntConsultFromALegOfAnotherDomainName(): void
+	{
+		$this->replies(array(self::agent(array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant2.example.com'))));
+
+		$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->transfer('consult', array('target' => '102')));
+		$this->assertSame(array(self::DUMP_AGENT), $this->commands());
+	}
+
 	// the target didn't answer, was busy or unreachable, or hung up after
 	// answering: att_xfer ended the consultation without clearing the note
 	public function testConsultsAgainAfterAConsultationThatEndedOnItsOwn(): void

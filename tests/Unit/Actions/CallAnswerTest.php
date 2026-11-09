@@ -123,6 +123,28 @@ class CallAnswerTest extends ActionTestCase
 		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
 	}
 
+	// an empty domain_uuid is no domain: the leg needs its domain_name then
+	public function testAnswersNotFoundForALegWithAnEmptyDomainUuidAndNoDomainName(): void
+	{
+		$this->replies(array(self::dump(array('variable_domain_uuid' => ''))));
+
+		$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->answer());
+		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
+	}
+
+	// FusionPBX's select() returns false for no row with 'column', as on a
+	// database error: a domain that is gone is no 500
+	public function testAnswersNotFoundForALegByDomainNameWhenTheDomainIsGone(): void
+	{
+		$this->replies(array(self::dump(array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant1.example.com'))));
+		\FakeStore::update(function (&$state) {
+			$state['tables']['v_domains'] = array();
+		});
+
+		$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->answer());
+		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
+	}
+
 	public function testAnswers500WhenTheDomainNameCantBeRead(): void
 	{
 		$this->replies(array(json_encode(array('Unique-ID' => self::CALL, 'Channel-Call-State' => 'RINGING', 'variable_domain_name' => 'tenant1.example.com'))));

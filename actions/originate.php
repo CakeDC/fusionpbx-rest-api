@@ -46,8 +46,15 @@ function do_action($body) {
   if(!is_array($extensions)) {
     return array("error" => "database error", "code" => 500);
   }
-  if($extensions && is_dial_number($extensions[0]["extension"])) {
-    $leg_a = "{".$leg_a_variables."}user/".$extensions[0]["extension"]."@".$domain_name;
+  // an extension's own number wins over another's alias that equals it
+  $extension = null;
+  foreach($extensions as $row) {
+    if($extension === null || (string)$row["extension"] === (string)$body->destination_a) {
+      $extension = (string)$row["extension"];
+    }
+  }
+  if($extension !== null && is_dial_number($extension)) {
+    $leg_a = "{".$leg_a_variables."}user/".$extension."@".$domain_name;
   } else {
     $leg_a = "{".$leg_a_variables.",loopback_bowout=false}loopback/".$body->destination_a."/".$domain_name;
   }

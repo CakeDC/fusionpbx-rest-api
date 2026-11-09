@@ -264,6 +264,65 @@ class CallListTest extends ActionTestCase
 		$this->assertSame(array('b2'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'));
 	}
 
+	// the extension's leg may be placed through a loopback, and be listed
+	// before the leg that placed it
+	public function testListsARingingCallPlacedThroughALoopbackOnce(): void
+	{
+		$this->respond(array(
+			self::channel('b1', array('call_uuid' => 'l1', 'direction' => 'outbound', 'callstate' => 'RINGING', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '101@tenant1.example.com')),
+			self::channel('a1', array('call_uuid' => 'a1', 'callstate' => 'RING_WAIT', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '103@tenant1.example.com')),
+			self::channel('l1', array('call_uuid' => 'a1', 'name' => 'loopback/101-a', 'context' => 'default', 'callstate' => 'RING_WAIT', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '')),
+		));
+
+		$this->assertSame(array('a1'), array_column($this->list()['data'], 'call_uuid'));
+		$this->assertSame(array('b1'), array_column($this->list(array('extension' => '101'))['data'], 'call_uuid'));
+		$this->assertSame(array('a1'), array_column($this->list(array('extension' => '103'))['data'], 'call_uuid'));
+	}
+
+	// the extensions as a comma separated string, both in a ringing call
+	public function testListsARingingCallOnceForACommaSeparatedString(): void
+	{
+		$this->respond(array(
+			self::channel('a1', array('call_uuid' => 'a1', 'callstate' => 'RING_WAIT', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '103@tenant1.example.com')),
+			self::channel('b1', array('call_uuid' => 'a1', 'direction' => 'outbound', 'callstate' => 'RINGING', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '101@tenant1.example.com')),
+		));
+
+		$this->assertSame(array('a1'), array_column($this->list(array('extension' => '101, 103'))['data'], 'call_uuid'));
+	}
+
+	// a carrier's leg is named after a number, which isn't an extension's
+	// SIP user even when it looks like one
+	public function testDoesntTakeACarriersLegForTheExtensionsPhone(): void
+	{
+		foreach (array('sofia/external/102@carrier.example.com', 'sofia/external-ipv6/102@carrier.example.com', 'sofia/gateway/carrier/102') as $name) {
+			$this->respond(
+				array(
+					self::channel('a1', array('cid_num' => '101', 'dest' => '102', 'presence_id' => '101@tenant1.example.com')),
+					self::channel('b1', array('direction' => 'outbound', 'name' => $name, 'cid_num' => '101', 'dest' => '102', 'presence_id' => '')),
+				),
+				array(array('uuid' => 'a1', 'b_uuid' => 'b1'))
+			);
+
+			$this->assertSame(array('a1'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'), $name);
+		}
+	}
+
+	// a leg with a domain of its own keeps it, whatever the leg paired with it
+	public function testPairedLegsOfDifferentDomainsKeepTheirOwn(): void
+	{
+		$this->respond(
+			array(
+				self::channel('a1', array('cid_num' => '101', 'dest' => '201', 'presence_id' => '101@tenant1.example.com')),
+				self::channel('b1', array('direction' => 'outbound', 'context' => 'tenant2.example.com', 'cid_num' => '101', 'dest' => '201', 'presence_id' => '201@tenant2.example.com')),
+			),
+			array(array('uuid' => 'a1', 'b_uuid' => 'b1'))
+		);
+
+		$this->assertSame(array('a1'), array_column($this->list()['data'], 'call_uuid'));
+		$this->assertSame(array('a1'), array_column($this->list(array('extension' => '201'))['data'], 'call_uuid'));
+		$this->assertSame(array('b1'), array_column($this->list(array('domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002'))['data'], 'call_uuid'));
+	}
+
 	// a call_uuid naming a channel that is gone, or the channel itself,
 	// doesn't join legs
 	public function testListsALegWhoseCallUuidIsNoLiveLegByItself(): void
@@ -338,6 +397,51 @@ class CallListTest extends ActionTestCase
 			array('call_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'held', 'caller_id_number' => '101', 'destination_number' => '102', 'consulting' => '102'),
 		)), $this->list());
 		$this->assertSame(array(self::CHANNELS, self::CALLS, self::GET_CONSULT, self::GET_TARGET), $this->state()['esl_commands']);
+	}
+
+	// 103 called the agent (101), who consults 102: the consult leg names the
+	// agent's leg in its call_uuid, so the consultation, ringing or answered,
+	// is part of the agent's call, which is listed by the agent's leg for the
+	// agent's extension and carries the number consulted
+	public static function consultations(): array
+	{
+		return array(
+			'ringing' => array('RING_WAIT', 'RINGING', false, false),
+			'ringing, target listed first' => array('RING_WAIT', 'RINGING', false, true),
+			'answered' => array('ACTIVE', 'ACTIVE', true, false),
+			'answered, target listed first' => array('ACTIVE', 'ACTIVE', true, true),
+		);
+	}
+
+	#[DataProvider('consultations')]
+	public function testListsTheConsultationOfAWarmTransferAsPartOfTheAgentsCall(string $consult_state, string $target_state, bool $answered, bool $target_first): void
+	{
+		$consult = self::channel(self::CONSULT, array('call_uuid' => self::AGENT, 'name' => 'loopback/102-a', 'context' => 'default', 'callstate' => $consult_state, 'presence_id' => '', 'cid_num' => '101', 'dest' => '102'));
+		$target = self::channel('t1', array('call_uuid' => self::CONSULT, 'direction' => 'outbound', 'context' => 'default', 'callstate' => $target_state, 'cid_num' => '101', 'dest' => '102', 'presence_id' => '102@tenant1.example.com'));
+		$calls = array(array('uuid' => 'c1', 'b_uuid' => self::AGENT));
+		if ($answered) {
+			$calls[] = array('uuid' => self::CONSULT, 'b_uuid' => 't1');
+		}
+		$this->respond(
+			array_merge(
+				array(
+					self::channel('c1', array('cid_num' => '103', 'dest' => '101', 'presence_id' => '103@tenant1.example.com')),
+					self::channel(self::AGENT, array('call_uuid' => 'c1', 'direction' => 'outbound', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '101@tenant1.example.com')),
+				),
+				$target_first ? array($target, $consult) : array($consult, $target)
+			),
+			$calls
+		);
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses'][self::GET_CONSULT] = self::CONSULT."\n";
+			$state['esl_responses'][self::GET_TARGET] = "102\n";
+		});
+
+		$this->assertSame(array(
+			array('call_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'held', 'caller_id_number' => '103', 'destination_number' => '101', 'consulting' => '102'),
+		), $this->list(array('extension' => '101'))['data']);
+		$this->assertSame(array('c1'), array_column($this->list()['data'], 'call_uuid'));
+		$this->assertSame(array('t1'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'));
 	}
 
 	// att_xfer ends a consultation on its own when the target doesn't answer

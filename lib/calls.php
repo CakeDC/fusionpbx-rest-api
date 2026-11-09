@@ -43,12 +43,13 @@ function rest_api_call($call_uuid, $domain_uuid) {
         if($channel_domain_name === "") {
             return array("error" => "call not found", "code" => 404);
         }
-        // FusionPBX's select() returns false on a database error
-        $domain_name = (new database)->select("SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid", array("domain_uuid" => $domain_uuid), 'column');
-        if($domain_name === false) {
+        // FusionPBX's select() returns false on a database error, and
+        // 'column' also returns false for no row, so 'all' tells them apart
+        $domains = (new database)->select("SELECT domain_name FROM v_domains WHERE domain_uuid = :domain_uuid", array("domain_uuid" => $domain_uuid), 'all');
+        if(!is_array($domains)) {
             return array("error" => "database error", "code" => 500);
         }
-        if($domain_name === null || strtolower((string)$domain_name) !== $channel_domain_name) {
+        if(!$domains || strtolower((string)$domains[0]["domain_name"]) !== $channel_domain_name) {
             return array("error" => "call not found", "code" => 404);
         }
     }

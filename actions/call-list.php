@@ -3,8 +3,8 @@ $required_params = array();
 $required_permissions = array("call_active_view");
 
 // the active calls of a domain, from FreeSWITCH's "show channels", one item
-// per call (the legs "show calls" pairs, and while it rings a leg with the
-// leg that placed it), optionally those of some extensions.
+// per call (the legs "show calls" pairs, and a leg with the leg that placed
+// it), optionally those of some extensions.
 // a channel's domain is decided as FusionPBX's active calls page does: its
 // context (the part after "@" if any) unless that is "public" or "default",
 // else the domain of its presence_id.
@@ -65,16 +65,35 @@ function do_action($body) {
         $live[strtolower((string)($channel["uuid"] ?? ""))] = true;
     }
 
-    // "show calls" only pairs legs once they are bridged. a leg that rings
-    // (placed by a bridge or an originate) names the leg that placed it in
-    // its call_uuid, so it is one call with that leg meanwhile
+    // "show calls" only pairs legs once they are bridged. a leg placed by
+    // another (by a bridge, an originate, or att_xfer's consult leg) names
+    // that leg in its call_uuid, so it is one call with that leg: a ringing
+    // call is listed once, and a warm transfer's consultation is part of the
+    // agent's call, which carries it as "consulting"
+    $uuid_of = array();
+    foreach($replies["channels"]["rows"] ?? array() as $channel) {
+        $uuid_of[strtolower((string)($channel["uuid"] ?? ""))] = (string)($channel["uuid"] ?? "");
+    }
+    $parent = $call_of;
     foreach($replies["channels"]["rows"] ?? array() as $channel) {
         $uuid = (string)($channel["uuid"] ?? "");
-        $placed_by = strtolower((string)($channel["call_uuid"] ?? ""));
-        if(isset($call_of[$uuid]) || $placed_by === "" || $placed_by === strtolower($uuid) || !isset($live[$placed_by])) {
-            continue;
+        $placed_by = $uuid_of[strtolower((string)($channel["call_uuid"] ?? ""))] ?? "";
+        if(!isset($parent[$uuid]) && $placed_by !== "" && $placed_by !== $uuid) {
+            $parent[$uuid] = $placed_by;
         }
-        $call_of[$uuid] = $call_of[$placed_by] ?? $placed_by;
+    }
+    // a leg is in the call of the first leg of its chain, whatever order the
+    // legs are listed in
+    $call_of = array();
+    foreach($parent as $uuid => $first) {
+        $seen = array($uuid => true);
+        while(isset($parent[$first]) && !isset($seen[$first])) {
+            $seen[$first] = true;
+            $first = $parent[$first];
+        }
+        if($first !== $uuid) {
+            $call_of[$uuid] = $first;
+        }
     }
 
     // the channels of the domain by call, in the order they are listed:
@@ -108,9 +127,11 @@ function do_action($body) {
             continue;
         }
         $presence_id = (string)($channel["presence_id"] ?? "");
-        // a phone's leg is named after its SIP user: sofia/<profile>/<user>@<host>
-        $name = (string)($channel["name"] ?? "");
-        $sip_user = strpos($name, "sofia/") === 0 ? explode("@", (string)(explode("/", $name, 3)[2] ?? ""), 2)[0] : null;
+        // a phone's leg is named after its SIP user: sofia/<profile>/<user>@<host>.
+        // not on a gateway or FusionPBX's external profiles, where carriers'
+        // legs are named after a number, which may look like an extension
+        $name = explode("/", (string)($channel["name"] ?? ""), 3);
+        $sip_user = $name[0] === "sofia" && isset($name[2]) && $name[1] !== "gateway" && strpos($name[1], "external") !== 0 ? explode("@", $name[2], 2)[0] : null;
         if($extensions === null) {
             $fit = $key === $uuid ? 1 : 0;
         } elseif(in_array(explode("@", $presence_id, 2)[0], $extensions, true) || ($sip_user !== null && in_array($sip_user, $extensions, true))) {
