@@ -290,6 +290,36 @@ class CallListTest extends ActionTestCase
 		$this->assertSame(array('a1'), array_column($this->list(array('extension' => '101, 103'))['data'], 'call_uuid'));
 	}
 
+	// on a call through a gateway the extension's phone is the sofia/internal
+	// leg, whichever way the call goes and in whatever order the legs come,
+	// not the leg that only carries its number
+	public function testListsACallThroughAGatewayByThePhonesLeg(): void
+	{
+		// the extension calls out
+		$this->respond(
+			array(
+				self::channel('b1', array('direction' => 'outbound', 'name' => 'sofia/gateway/carrier/5551234', 'cid_num' => '101', 'dest' => '5551234', 'presence_id' => '')),
+				self::channel('a1', array('cid_num' => '101', 'dest' => '5551234', 'presence_id' => '101@tenant1.example.com')),
+			),
+			array(array('uuid' => 'a1', 'b_uuid' => 'b1'))
+		);
+		$this->assertSame(array(array('a1', 'bridged')), array_map(function ($call) {
+			return array($call['call_uuid'], $call['state']);
+		}, $this->list(array('extension' => '101'))['data']));
+
+		// a carrier calls the extension
+		$this->respond(
+			array(
+				self::channel('a1', array('name' => 'sofia/external/+15550001111@carrier.example.com', 'cid_num' => '+15550001111', 'dest' => '102', 'presence_id' => '')),
+				self::channel('b1', array('direction' => 'outbound', 'name' => 'sofia/internal/102@192.0.2.10:5060', 'context' => 'default', 'cid_num' => '+15550001111', 'dest' => '102', 'presence_id' => '')),
+			),
+			array(array('uuid' => 'a1', 'b_uuid' => 'b1'))
+		);
+		$this->assertSame(array(array('b1', 'bridged')), array_map(function ($call) {
+			return array($call['call_uuid'], $call['state']);
+		}, $this->list(array('extension' => '102'))['data']));
+	}
+
 	// a carrier's leg is named after a number, which isn't an extension's
 	// SIP user even when it looks like one
 	public function testDoesntTakeACarriersLegForTheExtensionsPhone(): void
