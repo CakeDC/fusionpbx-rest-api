@@ -83,23 +83,27 @@ function do_action($body) {
         }
     }
     // a leg is in the call of the first leg of its chain, whatever order the
-    // legs are listed in
+    // legs are listed in. its depth is how many legs away from that first leg
+    // it is: a consult leg is one deeper than the agent's leg that placed it
     $call_of = array();
+    $depth = array();
     foreach($parent as $uuid => $first) {
         $seen = array($uuid => true);
+        $depth[$uuid] = 1;
         while(isset($parent[$first]) && !isset($seen[$first])) {
             $seen[$first] = true;
             $first = $parent[$first];
+            $depth[$uuid]++;
         }
         if($first !== $uuid) {
             $call_of[$uuid] = $first;
         }
     }
 
-    // the channels of the domain by call, in the order they are listed:
-    // the leg each call is listed by, and how well it fits (2: the
-    // extension's presence, 1: the extension called or was called, 0: the
-    // call's first leg without extensions)
+    // the channels of the domain by call: the leg each call is listed by,
+    // how well it fits (2: the extension's presence or SIP user, 1: the
+    // extension called or was called, 0: not the call's first leg, without
+    // extensions) and its depth
     $domains = array();
     foreach($replies["channels"]["rows"] ?? array() as $channel) {
         $context = (string)($channel["context"] ?? "");
@@ -141,8 +145,15 @@ function do_action($body) {
         } else {
             continue;
         }
-        if(!isset($calls[$key]) || $fit > $calls[$key]["fit"]) {
-            $calls[$key] = array("channel" => $channel, "fit" => $fit);
+        // legs that fit as well (the agent's leg and a consult leg named
+        // after the agent's SIP user, or a gateway leg that took the
+        // extension's presence) are decided by the leg nearest the call's
+        // first leg, then by uuid, never by the order of "show channels"
+        $leg_depth = $uuid === $key ? 0 : ($depth[$uuid] ?? 1);
+        if(!isset($calls[$key]) || $fit > $calls[$key]["fit"]
+            || ($fit === $calls[$key]["fit"] && ($leg_depth < $calls[$key]["depth"]
+                || ($leg_depth === $calls[$key]["depth"] && strcmp($uuid, $calls[$key]["channel"]["uuid"]) < 0)))) {
+            $calls[$key] = array("channel" => $channel, "fit" => $fit, "depth" => $leg_depth);
         }
     }
 

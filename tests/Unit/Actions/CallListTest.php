@@ -337,6 +337,34 @@ class CallListTest extends ActionTestCase
 		}
 	}
 
+	// a gateway leg may take the presence of the extension that called out:
+	// both legs fit the extension, and the one nearest the call's first leg
+	// (the phone's) is listed, in whatever order the legs come
+	public function testPrefersThePhonesLegOverAGatewayLegWithItsPresence(): void
+	{
+		$phone = self::channel('a1', array('cid_num' => '101', 'dest' => '5551234', 'presence_id' => '101@tenant1.example.com'));
+		$gateway = self::channel('b1', array('direction' => 'outbound', 'name' => 'sofia/gateway/carrier/5551234', 'cid_num' => '101', 'dest' => '5551234', 'presence_id' => '101@tenant1.example.com'));
+		foreach (array('phone first' => array($phone, $gateway), 'gateway first' => array($gateway, $phone)) as $order => $channels) {
+			$this->respond($channels, array(array('uuid' => 'a1', 'b_uuid' => 'b1')));
+
+			$this->assertSame(array('a1'), array_column($this->list(array('extension' => '101'))['data'], 'call_uuid'), $order);
+		}
+	}
+
+	// a phone registered twice rings on two legs, equally near the call's
+	// first leg: the lowest uuid is listed, in whatever order the legs come
+	public function testListsTheSameLegOfAPhoneRingingTwiceInAnyOrder(): void
+	{
+		$caller = self::channel('a1', array('callstate' => 'RING_WAIT', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '103@tenant1.example.com'));
+		$first = self::channel('b1', array('call_uuid' => 'a1', 'direction' => 'outbound', 'name' => 'sofia/internal/101@192.0.2.10:5060', 'context' => 'default', 'callstate' => 'RINGING', 'cid_num' => '103', 'dest' => '101', 'presence_id' => ''));
+		$second = self::channel('b2', array('call_uuid' => 'a1', 'direction' => 'outbound', 'name' => 'sofia/internal/101@192.0.2.11:5060', 'context' => 'default', 'callstate' => 'RINGING', 'cid_num' => '103', 'dest' => '101', 'presence_id' => ''));
+		foreach (array('b1 first' => array($caller, $first, $second), 'b2 first' => array($second, $first, $caller)) as $order => $channels) {
+			$this->respond($channels);
+
+			$this->assertSame(array('b1'), array_column($this->list(array('extension' => '101'))['data'], 'call_uuid'), $order);
+		}
+	}
+
 	// a leg with a domain of its own keeps it, whatever the leg paired with it
 	public function testPairedLegsOfDifferentDomainsKeepTheirOwn(): void
 	{
@@ -472,6 +500,28 @@ class CallListTest extends ActionTestCase
 		), $this->list(array('extension' => '101'))['data']);
 		$this->assertSame(array('c1'), array_column($this->list()['data'], 'call_uuid'));
 		$this->assertSame(array('t1'), array_column($this->list(array('extension' => '102'))['data'], 'call_uuid'));
+	}
+
+	// a consult leg named after the agent's SIP user fits the agent's
+	// extension as well as the agent's leg, which placed it: the agent's leg
+	// is listed, so call actions don't act on the consult leg, in whatever
+	// order the legs come
+	public function testListsTheAgentsLegRatherThanAConsultLegNamedAfterTheAgent(): void
+	{
+		$caller = self::channel('c1', array('cid_num' => '103', 'dest' => '101', 'presence_id' => '103@tenant1.example.com'));
+		$agent = self::channel(self::AGENT, array('call_uuid' => 'c1', 'direction' => 'outbound', 'cid_num' => '103', 'dest' => '101', 'presence_id' => '101@tenant1.example.com'));
+		$consult = self::channel(self::CONSULT, array('call_uuid' => self::AGENT, 'name' => 'sofia/internal/101@192.0.2.10:5060', 'context' => 'default', 'callstate' => 'RING_WAIT', 'presence_id' => '', 'cid_num' => '101', 'dest' => '102'));
+		foreach (array('agent first' => array($caller, $agent, $consult), 'consult first' => array($consult, $caller, $agent)) as $order => $channels) {
+			$this->respond($channels, array(array('uuid' => 'c1', 'b_uuid' => self::AGENT)));
+			\FakeStore::update(function (&$state) {
+				$state['esl_responses'][self::GET_CONSULT] = self::CONSULT."\n";
+				$state['esl_responses'][self::GET_TARGET] = "102\n";
+			});
+
+			$this->assertSame(array(
+				array('call_uuid' => self::AGENT, 'domain_uuid' => self::DOMAIN_UUID, 'state' => 'held', 'caller_id_number' => '103', 'destination_number' => '101', 'consulting' => '102'),
+			), $this->list(array('extension' => '101'))['data'], $order);
+		}
 	}
 
 	// att_xfer ends a consultation on its own when the target doesn't answer
