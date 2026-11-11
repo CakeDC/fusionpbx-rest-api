@@ -136,6 +136,9 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 ## Upgrading from earlier versions
 
+From 2.0.1 to 2.0.2:
+- `callcenter-queue-status`, `callcenter-agent-status` and `callcenter-agent-state` answer `500 {"error": "mod_callcenter not loaded"}` instead of `500 {"error": "event socket error"}` when FreeSWITCH runs without mod_callcenter. A client that maps the error body should treat it as the call center being unavailable on the server; the fix is loading mod_callcenter in FreeSWITCH.
+
 From 2.0.0 to 2.0.1:
 - `call-transfer` and `call-transfer-attended` need `rest_api_call_control` instead of `call_active_transfer` (which no group could hold, so they always answered `403`). The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`. Grant them to the integration's user's group if it should transfer calls.
 
