@@ -7,7 +7,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * rest_api_call_center_error(): a callcenter_config command that failed
  * because FreeSWITCH runs without mod_callcenter is told apart from any other
- * failure of the event socket.
+ * failure of the event socket, and so is an agent mod_callcenter hasn't
+ * loaded.
  */
 class CallCenterTest extends TestCase
 {
@@ -51,10 +52,21 @@ class CallCenterTest extends TestCase
 		$this->assertStringContainsString($command.' failed: '.json_encode($reply), $logged);
 	}
 
+	public function testAnswersAgentNotLoadedForAnAgentMod_callcenterDoesntKnow(): void
+	{
+		$command = "api callcenter_config agent set status x 'On Break'";
+		$reply = array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent!');
+
+		list($result, $logged) = self::errorLogged($command, $reply);
+
+		$this->assertSame(array('error' => 'agent not loaded in mod_callcenter', 'code' => 500), $result);
+		$this->assertStringContainsString($command.' failed: '.json_encode($reply), $logged);
+	}
+
 	public static function otherFailures(): array
 	{
 		return array(
-			'mod_callcenter refusing the command' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent!')),
+			'mod_callcenter refusing the command' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Status!')),
 			'another command not found' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR show Command not found!')),
 			'the text not at the start' => array(array('error' => 'freeswitch rejected request', 'details' => 'reply: -ERR callcenter_config Command not found!')),
 			'an empty reply' => array(array('error' => 'freeswitch rejected request', 'details' => '')),

@@ -30,25 +30,27 @@ function do_action($body) {
     }
 
     if($set) {
-        $commands = array("api callcenter_config agent set status ".$agent_uuid." '".$body->status."'");
-        // as the agent status page does
-        if($body->status === "Available" || $body->status === "Logged Out") {
-            $commands[] = "api callcenter_config agent set state ".$agent_uuid." 'Waiting'";
-        }
-        foreach($commands as $command) {
-            $reply = rest_api_call_center_command($command);
-            if(is_array($reply)) {
-                return $reply;
-            }
+        $reply = rest_api_call_center_command("api callcenter_config agent set status ".$agent_uuid." '".$body->status."'");
+        if(is_array($reply)) {
+            return $reply;
         }
 
         // FreeSWITCH reloads agents with the status of their row
-        // (callcenter.conf.lua), so it survives a restart
+        // (callcenter.conf.lua), so it survives a restart. saved as soon as
+        // mod_callcenter has it, so the row matches it whatever comes next
         $array["call_center_agents"][] = array("call_center_agent_uuid" => $agent_uuid, "agent_status" => $body->status);
         $database->app_name = 'rest_api';
         $database->app_uuid = '2bfe71d9-e112-4b8b-bcff-75aeb0e06302';
         if(!$database->save($array)) {
             return array("error" => "error saving agent status", "code" => 500);
+        }
+
+        // as the agent status page does
+        if($body->status === "Available" || $body->status === "Logged Out") {
+            $reply = rest_api_call_center_command("api callcenter_config agent set state ".$agent_uuid." 'Waiting'");
+            if(is_array($reply)) {
+                return $reply;
+            }
         }
     }
 

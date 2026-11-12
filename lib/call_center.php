@@ -4,14 +4,25 @@
 
 // the 500 of a failed callcenter_config command (an error array of parse_fs()
 // or fs_api_value()), logged with why. without mod_callcenter FreeSWITCH
-// answers "-ERR callcenter_config Command not found!" (mod_event_socket):
-// said apart, so a missing module isn't taken for a broken event socket
+// answers "-ERR callcenter_config Command not found!" (mod_event_socket), and
+// mod_callcenter answers "-ERR Invalid Agent!" to "agent set" for an agent it
+// hasn't loaded: both said apart, so neither is taken for a broken event socket
 function rest_api_call_center_error($command, $reply) {
     error_log("rest_api: ".$command." failed: ".json_encode($reply));
-    if(strpos((string)($reply["details"] ?? ""), "-ERR callcenter_config Command not found") === 0) {
+    $details = (string)($reply["details"] ?? "");
+    if(strpos($details, "-ERR callcenter_config Command not found") === 0) {
         return array("error" => "mod_callcenter not loaded", "code" => 500);
     }
+    if(strpos($details, "-ERR Invalid Agent!") === 0) {
+        return rest_api_call_center_agent_not_loaded();
+    }
     return array("error" => "event socket error", "code" => 500);
+}
+
+// an agent of the database that mod_callcenter doesn't know: it loads agents
+// at start and on a save in FusionPBX's UI, not when a row is written directly
+function rest_api_call_center_agent_not_loaded() {
+    return array("error" => "agent not loaded in mod_callcenter", "code" => 500);
 }
 
 // runs a callcenter_config command that answers a bare reply ("+OK"); gives
@@ -61,5 +72,5 @@ function rest_api_call_center_agent_live($agent_uuid, $user_uuid) {
         );
     }
     error_log("rest_api: agent ".$agent_uuid." is not loaded in mod_callcenter");
-    return array("error" => "event socket error", "code" => 500);
+    return rest_api_call_center_agent_not_loaded();
 }

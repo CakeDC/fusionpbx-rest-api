@@ -138,6 +138,8 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 From 2.0.1 to 2.0.2:
 - `callcenter-queue-status`, `callcenter-agent-status` and `callcenter-agent-state` answer `500 {"error": "mod_callcenter not loaded"}` instead of `500 {"error": "event socket error"}` when FreeSWITCH runs without mod_callcenter. A client that maps the error body should treat it as the call center being unavailable on the server; the fix is loading mod_callcenter in FreeSWITCH.
+- `callcenter-agent-status` and `callcenter-agent-state` answer `500 {"error": "agent not loaded in mod_callcenter"}` instead of `500 {"error": "event socket error"}` for an agent that is in the database but not in mod_callcenter. The fix is saving the agent in FusionPBX's UI or reloading mod_callcenter.
+- `callcenter-agent-status` saves a status FreeSWITCH took even when the `agent set state ... 'Waiting'` that follows fails (it still answers `500`).
 
 From 2.0.0 to 2.0.1:
 - `call-transfer` and `call-transfer-attended` need `rest_api_call_control` instead of `call_active_transfer` (which no group could hold, so they always answered `403`). The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`. Grant them to the integration's user's group if it should transfer calls.
@@ -515,7 +517,7 @@ List the call center agents of a domain, sorted by agent name: `{"data": [...]}`
 
 Set the call center state of a user's agent in FreeSWITCH's mod_callcenter (`callcenter_config agent set state`), for example `Waiting`, and return `{"user_uuid", "status", "state", "wrap_up_until"}` read live as `callcenter-agent-status` does. The state only lives in mod_callcenter; FusionPBX keeps no copy of it. A user with several agents in the domain is answered for the first by agent name.
 
-A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead.
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, and an unknown state or malformed uuid returns `400`. When the event socket can't be reached or FreeSWITCH refuses the command, it returns `500 {"error": "event socket error"}` and logs the reason. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead. An agent that mod_callcenter hasn't loaded (it isn't in `callcenter_config agent list`, or `agent set` answers `-ERR Invalid Agent!`, e.g. an agent written to the database but never saved in FusionPBX's UI) returns `500 {"error": "agent not loaded in mod_callcenter"}`; saving the agent in the UI, or reloading mod_callcenter, loads it.
 
 ## `callcenter-agent-status`
 | Parameter     | Required | Description |
@@ -528,7 +530,7 @@ Read, or set, the call center status of a user's agent: `{"user_uuid", "status",
 
 Setting runs the commands of FusionPBX's agent status page (`callcenter_config agent set status`, and `agent set state ... 'Waiting'` after `Available` or `Logged Out`) and saves the status on the agent, so FreeSWITCH keeps it after a restart. It doesn't change the user's own status (`user_status`) or the BLF lamps the page also updates.
 
-A user without an agent in the domain returns `404 {"error": "agent not found"}`, an unknown status or malformed uuid returns `400`, and setting without `call_center_agent_edit` returns `403`. When the event socket can't be reached or FreeSWITCH refuses a command, it returns `500 {"error": "event socket error"}` and logs the reason; a refused status isn't saved. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead.
+A user without an agent in the domain returns `404 {"error": "agent not found"}`, an unknown status or malformed uuid returns `400`, and setting without `call_center_agent_edit` returns `403`. When the event socket can't be reached or FreeSWITCH refuses a command, it returns `500 {"error": "event socket error"}` and logs the reason; a refused status isn't saved, and a status FreeSWITCH took is saved even when setting the state afterwards fails. Without mod_callcenter loaded in FreeSWITCH (`callcenter_config` answers `-ERR callcenter_config Command not found!`) it returns `500 {"error": "mod_callcenter not loaded"}` instead. An agent that mod_callcenter hasn't loaded (it isn't in `callcenter_config agent list`, or `agent set` answers `-ERR Invalid Agent!`, e.g. an agent written to the database but never saved in FusionPBX's UI) returns `500 {"error": "agent not loaded in mod_callcenter"}`; saving the agent in the UI, or reloading mod_callcenter, loads it.
 
 ## `callcenter-queue-list`
 | Parameter     | Required | Description |
