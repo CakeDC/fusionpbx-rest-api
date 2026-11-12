@@ -69,6 +69,24 @@ class CallHangupTest extends ActionTestCase
 		$this->assertSame(array(self::DUMP, self::KILL), $this->state()['esl_commands']);
 	}
 
+	// the leg of the extension called has only the domain_name the dialplan
+	// exports
+	public function testHangsUpALegWithoutDomainUuidByItsDomainName(): void
+	{
+		$this->replies(self::dump(array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant1.example.com')));
+
+		$this->assertSame(array('code' => 204), $this->hangup());
+		$this->assertSame(array(self::DUMP, self::KILL), $this->state()['esl_commands']);
+	}
+
+	public function testAnswersNotFoundForALegOfAnotherDomainName(): void
+	{
+		$this->replies(self::dump(array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant2.example.com')));
+
+		$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->hangup());
+		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
+	}
+
 	// a call_uuid is global to FreeSWITCH: a call of another domain is not touched
 	public function testAnswersNotFoundForACallOfAnotherDomain(): void
 	{
