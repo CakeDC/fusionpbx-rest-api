@@ -84,6 +84,25 @@ class CallHoldTest extends ActionTestCase
 		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
 	}
 
+	// the leg of the extension called has only the domain_name the dialplan
+	// exports
+	public function testHoldsALegWithoutDomainUuidByItsDomainName(): void
+	{
+		$leg = array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant1.example.com');
+		$this->replies(array(self::dump($leg), self::dump(array('Channel-Call-State' => 'HELD') + $leg)));
+
+		$this->assertSame('held', $this->hold()['state']);
+		$this->assertSame(array(self::DUMP, self::HOLD, self::DUMP), $this->state()['esl_commands']);
+	}
+
+	public function testAnswersNotFoundForALegOfAnotherDomainName(): void
+	{
+		$this->replies(array(self::dump(array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant2.example.com'))));
+
+		$this->assertSame(array('error' => 'call not found', 'code' => 404), $this->hold());
+		$this->assertSame(array(self::DUMP), $this->state()['esl_commands']);
+	}
+
 	public function testAnswersNotFoundForACallOfAnotherDomain(): void
 	{
 		$this->replies(array(self::dump(array('variable_domain_uuid' => 'aaaaaaaa-0000-4000-8000-000000000002'))));

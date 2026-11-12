@@ -136,6 +136,11 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 ## Upgrading from earlier versions
 
+From 2.0.1 to 2.0.2:
+- `call-list` with `extension` lists a call between two extensions by the leg of the extension asked for also when that leg has no context or presence of the domain (it used to list the caller's leg for both extensions, so `call-transfer` moved the agent instead of the caller, and `call-transfer-attended` consulted from the caller's phone). The call actions accept a leg that has only the `domain_name` variable.
+- `call-list` lists a ringing call once (it used to list it once per leg until it was answered).
+- `originate` calls an extension of the domain given as `destination_a` directly (`user/`) instead of through a loopback, and any other `destination_a` through a loopback that doesn't bow out: the `call_uuid` it returned used to disappear once the call was answered, so the call actions answered `404` for it. destination_a's phone now shows `caller_id_number` (and `caller_id_name`) too. Calling the extension directly skips the domain's dialplan for destination_a: its call forwarding, do not disturb, follow me and voicemail on no answer no longer apply, and an extension that isn't registered fails the call with `500 {"error": "call failed: USER_NOT_REGISTERED"}` (it used to go through the dialplan, e.g. to voicemail).
+
 From 2.0.0 to 2.0.1:
 - `call-transfer` and `call-transfer-attended` need `rest_api_call_control` instead of `call_active_transfer` (which no group could hold, so they always answered `403`). The `consult` stage of `call-transfer-attended` also needs `click_to_call_call`. Grant them to the integration's user's group if it should transfer calls.
 
@@ -406,9 +411,11 @@ A missing permission returns `403` with `missing_permissions`, a ring group that
 | `destination_a`    | yes      | the number to call first  |
 | `destination_b`    | yes      | the number to call second |
 
-Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. The selected domain's internal dialplan is used, so internal extensions may be dialed. Numbers are digits, `*`, `#` and an optional leading `+`.
+Call one number (destination_a) and connect the call to another number (destination_b) when it's picked up. An extension of the domain as destination_a (its number, or else another extension's alias) is called directly (`user/<extension>@<domain>`, as FusionPBX's click-to-call does); any other destination_a, and destination_b, go through the selected domain's internal dialplan (`loopback/`), so internal extensions may be dialed. Numbers are digits, `*`, `#` and an optional leading `+`.
 
-Answers `201` with the call as `call-list` returns it (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`, `consulting`), once destination_a has answered. `call_uuid` is the leg that rings destination_a and bridges destination_b; it carries the domain, so `call-hangup`, `call-hold`, `call-resume` and `call-transfer` accept it.
+Answers `201` with the call as `call-list` returns it (`call_uuid`, `domain_uuid`, `state`, `caller_id_number`, `destination_number`, `consulting`), once destination_a has answered. `call_uuid` is the leg that rings destination_a and bridges destination_b; it carries the domain, so `call-hangup`, `call-hold`, `call-resume`, `call-transfer` and `call-transfer-attended` accept it, and treat it as the agent's call (destination_b is the other party). A loopback channel normally bows out once the call it places is answered, taking its uuid with it, so destination_a is either the extension's own leg or a loopback with `loopback_bowout=false`.
+
+An extension called directly skips the domain's dialplan, as in FusionPBX's click-to-call: its call forwarding, do not disturb, follow me and voicemail on no answer don't apply, and an extension that isn't registered fails the call (`500 {"error": "call failed: USER_NOT_REGISTERED"}`).
 
 When FreeSWITCH can't place the call it returns `500` with its reason, e.g. `{"error": "call failed: NO_ANSWER"}`, and `500 {"error": "event socket error"}` when the event socket can't be reached. An invalid number returns `400 {"error": "invalid <parameter>"}`.
 
@@ -422,7 +429,7 @@ Use `destination_b=*9664` to indefinitely play hold music to destination_a.
 | `domain_uuid` | no  | Domain to act on. Defaults to the key user's domain |
 | `call_uuid`   | yes | The ringing call's channel uuid, as `call-list` returns it |
 
-Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain (its `domain_uuid` variable) is checked first: a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
+Answer a ringing call (`uuid_answer`) and return it as `call-list` does, read again after the answer. A call uuid is global to FreeSWITCH, so the channel's domain is checked first: its `domain_uuid` variable, or, on a leg without it, its `domain_name` variable (the dialplan sets `domain_uuid` on the caller's leg and exports only `domain_name` to the leg it calls): a call of another domain, a channel without a domain or a call that doesn't exist returns `404 {"error": "call not found"}` and is not touched. A malformed uuid returns `400 {"error": "invalid call_uuid"}`. When the event socket can't be reached or FreeSWITCH refuses, it returns `500 {"error": "event socket error"}` and logs the reason.
 
 FusionPBX has no permission for answering a call, so the plugin adds `rest_api_call_control`, given to the superadmin and admin groups by Upgrade → Permission Defaults. Holding, resuming and transferring a call use it too.
 
@@ -448,9 +455,9 @@ Put an answered call on hold (`uuid_hold`, never toggled), so the other party he
 | `domain_uuid` | no | Domain to act on. Defaults to the key user's domain |
 | `extension`   | no | Only the calls of these extensions (an array, or comma separated): one of them called, was called, or is a leg's presence (e.g. a ring group ringing it) |
 
-List the active calls of a domain from FreeSWITCH (`show channels`), one item per call: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number", "consulting"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id.
+List the active calls of a domain from FreeSWITCH (`show channels`), one item per call: `{"data": [{"call_uuid", "domain_uuid", "state", "caller_id_number", "destination_number", "consulting"}, ...]}`. A channel's domain is decided as FusionPBX's active calls page does: its context (the part after `@`, if any) unless that is `public` or `default`, otherwise the domain of its presence id. A leg that has neither (often the leg of the extension called) is in the domain of the leg `show calls` pairs it with.
 
-The legs `show calls` pairs are one call (a ring group pairs its first leg with every leg it rings). The call actions act on the leg they get (holding a leg plays the music to the other one, `call-transfer` transfers the other one), so a call is listed by one of its legs, the one to pass as `call_uuid`: with `extension`, the leg whose presence is one of the extensions (the extension's own phone), else a leg where one of them called or was called; without it, the call's first leg. A call is listed once even when several of the extensions are in it.
+The legs `show calls` pairs are one call (a ring group pairs its first leg with every leg it rings). `show calls` only pairs them once they are bridged, so a leg is also one call with the leg its `call_uuid` column names (the leg that placed it): a ringing call is listed once too, and the consult leg of `call-transfer-attended` (with the leg it calls) is part of the agent's call, which carries it as `consulting`. The call actions act on the leg they get (holding a leg plays the music to the other one, `call-transfer` transfers the other one), so a call is listed by one of its legs, the one to pass as `call_uuid`: with `extension`, the leg of the extension's own phone (its presence or SIP user, `sofia/<profile>/<extension>@...`, is one of the extensions; not on a gateway or an `external` profile, where a carrier's leg is named after a number), else a leg where one of them called or was called; without it, the call's first leg. A call is listed once even when several of the extensions are in it.
 
 `state` comes from the channel's call state: `ringing` (`DOWN`, `DIALING`, `RINGING`, `EARLY`, `RING_WAIT`, or any state FreeSWITCH adds later), `answered` (`ACTIVE`, `UNHELD`), `held` (`HELD`), `ended` (`HANGUP`), and `bridged` for an answered channel that `show calls` pairs with another leg.
 

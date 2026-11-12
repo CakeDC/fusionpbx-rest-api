@@ -114,6 +114,17 @@ class CallTransferTest extends ActionTestCase
 		$this->assertSame(array('api uuid_dump '.self::CALL.' json', 'api uuid_transfer '.self::CALL.' -bleg '.$destination), $this->state()['esl_commands']);
 	}
 
+	// 101 calls the agent: the agent's leg (the one call-list gives for the
+	// agent's extension) has only the domain_name the dialplan exports, and
+	// the caller, its other leg, is the one transferred
+	public function testTransfersTheCallerFromTheLegOfTheAgentCalled(): void
+	{
+		$this->replies(self::dump(self::CALL, array('variable_domain_uuid' => '', 'variable_domain_name' => 'tenant1.example.com')), self::dump(self::OTHER_LEG));
+
+		$this->assertSame('ended', $this->transfer('extension', '102')['state']);
+		$this->assertSame(array('api uuid_dump '.self::CALL.' json', 'api uuid_transfer '.self::CALL.' -bleg 102 XML tenant1.example.com'), $this->state()['esl_commands']);
+	}
+
 	// e.g. a call ringing the agent that isn't answered yet: it goes on, but
 	// is the agent's call no more
 	public function testTransfersTheChannelItselfWhenItIsNotBridged(): void
