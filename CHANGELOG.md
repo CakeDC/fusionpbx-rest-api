@@ -6,8 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `callcenter-queue-status`, `callcenter-agent-status` and `callcenter-agent-state` answer `500` `{"error": "mod_callcenter not loaded"}` instead of `event socket error` when FreeSWITCH runs without mod_callcenter (`-ERR callcenter_config Command not found!`), so a missing module can be told apart from an event socket that can't be reached. The log line of `callcenter-queue-status` now names the failed command.
+- `callcenter-agent-status` and `callcenter-agent-state` answer `500` `{"error": "agent not loaded in mod_callcenter"}` instead of `event socket error` for an agent that mod_callcenter hasn't loaded: missing from `callcenter_config agent list`, or `agent set` answering `-ERR Invalid Agent!`. Agents written to the database are only loaded by mod_callcenter on a save in FusionPBX's UI or a reload.
+
 ### Fixed
 
+- `callcenter-agent-status` with `status` didn't save the status when FreeSWITCH took it but refused the `agent set state ... 'Waiting'` that follows `Available` and `Logged Out`, so the agent's row no longer matched mod_callcenter and a restart brought the old status back. The status is now saved as soon as FreeSWITCH takes it.
 - `call-list` with `extension` listed a call between two extensions by the caller's leg for both of them when the called extension's leg had no context or presence of the domain, so `call-transfer` moved the agent instead of the caller and `call-transfer-attended` consulted from the caller's phone. Such a leg now takes the domain of the leg it is paired with, and a call is listed by the leg of the extension's own phone (its presence, or its SIP user on a profile other than a gateway or an `external` one).
 - `call-list` listed a ringing call once per leg until it was answered. A leg placed by another (its `call_uuid`) is now part of that leg's call, and so is the consult leg of `call-transfer-attended`, which stays part of the agent's call.
 - `call-list` with `extension` listed a call by whichever of its legs came first in `show channels` when several fit the extension equally (a consult leg named after the agent's SIP user, a gateway leg that took the extension's presence, a phone ringing on two registrations), so a call action could act on a different leg from one request to the next. The leg nearest the call's first leg is now listed, then the lowest `call_uuid`.

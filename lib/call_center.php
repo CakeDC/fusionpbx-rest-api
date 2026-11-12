@@ -2,6 +2,36 @@
 // call center agents in mod_callcenter, which knows each by its
 // call_center_agent_uuid (as FusionPBX's agent status page uses it)
 
+// the 500 of a failed callcenter_config command (an error array of parse_fs()
+// or fs_api_value()), logged with why. without mod_callcenter FreeSWITCH
+// answers "-ERR callcenter_config Command not found!" (mod_event_socket), and
+// mod_callcenter answers "-ERR Invalid Agent!" to "agent set" for an agent it
+// hasn't loaded: both said apart, so neither is taken for a broken event socket
+function rest_api_call_center_error($command, $reply) {
+    error_log("rest_api: ".$command." failed: ".json_encode($reply));
+    $details = (string)($reply["details"] ?? "");
+    if(strpos($details, "-ERR callcenter_config Command not found") === 0) {
+        return array("error" => "mod_callcenter not loaded", "code" => 500);
+    }
+    if(strpos($details, "-ERR Invalid Agent!") === 0) {
+        return rest_api_call_center_agent_not_loaded();
+    }
+    return array("error" => "event socket error", "code" => 500);
+}
+
+// an agent of the database that mod_callcenter doesn't know: it loads agents
+// at start and on a save in FusionPBX's UI, not when a row is written directly
+function rest_api_call_center_agent_not_loaded() {
+    return array("error" => "agent not loaded in mod_callcenter", "code" => 500);
+}
+
+// runs a callcenter_config command that answers a bare reply ("+OK"); gives
+// the reply or the 500 to answer
+function rest_api_call_center_command($command) {
+    $reply = fs_api_value($command);
+    return is_array($reply) ? rest_api_call_center_error($command, $reply) : $reply;
+}
+
 // the agent of a user in the domain, the first by agent name when there are
 // several, or the response to answer: 404 without one, 500 on a database error
 function rest_api_call_center_agent($database, $domain_uuid, $user_uuid) {
@@ -27,8 +57,7 @@ function rest_api_call_center_agent_live($agent_uuid, $user_uuid) {
     $command = "api callcenter_config agent list ".$agent_uuid;
     $rows = parse_fs($command);
     if(isset($rows["error"])) {
-        error_log("rest_api: ".$command." failed: ".json_encode($rows));
-        return array("error" => "event socket error", "code" => 500);
+        return rest_api_call_center_error($command, $rows);
     }
     foreach($rows as $row) {
         if(strtolower($row["name"] ?? "") !== $agent_uuid) {
@@ -43,5 +72,5 @@ function rest_api_call_center_agent_live($agent_uuid, $user_uuid) {
         );
     }
     error_log("rest_api: agent ".$agent_uuid." is not loaded in mod_callcenter");
-    return array("error" => "event socket error", "code" => 500);
+    return rest_api_call_center_agent_not_loaded();
 }

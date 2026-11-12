@@ -150,9 +150,9 @@ class CallCenterAgentStatusTest extends ActionTestCase
 		$this->assertSame(array('On Break', 'Idle'), array($result['status'], $result['state']));
 	}
 
-	// FusionPBX loads every agent into mod_callcenter; one it doesn't know is
-	// listed as nothing
-	public function testAnswers500ForAnAgentMissingInFreeswitch(): void
+	// mod_callcenter lists an agent it hasn't loaded as nothing (one written to
+	// the database but never saved in FusionPBX's UI)
+	public function testAnswersAgentNotLoadedForAnAgentMissingInFreeswitch(): void
 	{
 		\FakeStore::update(function (&$store) {
 			$store['esl_responses'][self::LIST] = CallCenterAgentList::reply();
@@ -160,7 +160,7 @@ class CallCenterAgentStatusTest extends ActionTestCase
 
 		list($result, $logged) = $this->agentStatusLogged(array());
 
-		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
+		$this->assertSame(array('error' => 'agent not loaded in mod_callcenter', 'code' => 500), $result);
 		$this->assertStringContainsString(self::ANA.' is not loaded in mod_callcenter', $logged);
 	}
 
@@ -250,14 +250,62 @@ class CallCenterAgentStatusTest extends ActionTestCase
 	public function testAnswers500WhenFreeswitchRefusesTheStatus(): void
 	{
 		\FakeStore::update(function (&$state) {
-			$state['esl_response'] = "-ERR Invalid Agent!\n";
+			$state['esl_response'] = "-ERR Invalid Status!\n";
 		});
 
 		list($result, $logged) = $this->agentStatusLogged(array('status' => 'On Break'));
 
 		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
-		$this->assertStringContainsString('-ERR Invalid Agent!', $logged);
+		$this->assertStringContainsString('-ERR Invalid Status!', $logged);
 		$this->assertSame('Logged Out', $this->savedStatus());
+	}
+
+	// mod_callcenter answers "agent set" for an agent it hasn't loaded so
+	public function testAnswersAgentNotLoadedWhenFreeswitchDoesntKnowTheAgent(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_response'] = "-ERR Invalid Agent!\n";
+		});
+
+		$this->assertSame(array('error' => 'agent not loaded in mod_callcenter', 'code' => 500), $this->agentStatus(array('status' => 'On Break')));
+		$this->assertSame('Logged Out', $this->savedStatus());
+	}
+
+	// what mod_event_socket answers when FreeSWITCH runs without mod_callcenter
+	public function testAnswers500WhenModCallcenterIsNotLoaded(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses'][self::LIST] = "-ERR callcenter_config Command not found!\n";
+			$state['esl_response'] = "-ERR callcenter_config Command not found!\n";
+		});
+
+		foreach (array(array(), array('status' => 'On Break')) as $fields) {
+			list($result, $logged) = $this->agentStatusLogged($fields);
+
+			$this->assertSame(array('error' => 'mod_callcenter not loaded', 'code' => 500), $result, json_encode($fields));
+			$this->assertStringContainsString('-ERR callcenter_config Command not found!', $logged);
+		}
+		$this->assertSame('Logged Out', $this->savedStatus());
+	}
+
+	// FreeSWITCH took the status but not the state: the row has the status
+	// mod_callcenter has
+	public function testSavesTheStatusWhenSettingTheStateFails(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses']["api callcenter_config agent set status ".self::ANA." 'Available'"] = "+OK\n";
+			$state['esl_responses']["api callcenter_config agent set state ".self::ANA." 'Waiting'"] = "-ERR callcenter_config Command not found!\n";
+		});
+
+		list($result, $logged) = $this->agentStatusLogged(array('status' => 'Available'));
+
+		$this->assertSame(array('error' => 'mod_callcenter not loaded', 'code' => 500), $result);
+		$this->assertStringContainsString("agent set state ".self::ANA." 'Waiting' failed", $logged);
+		$this->assertSame(array(
+			"api callcenter_config agent set status ".self::ANA." 'Available'",
+			"api callcenter_config agent set state ".self::ANA." 'Waiting'",
+		), $this->state()['esl_commands']);
+		$this->assertSame('Available', $this->savedStatus());
 	}
 
 	public function testAnswers500WhenTheEventSocketIsUnavailable(): void
@@ -285,5 +333,14 @@ class CallCenterAgentStatusTest extends ActionTestCase
 		$this->failSaves();
 
 		$this->assertSame(array('error' => 'error saving agent status', 'code' => 500), $this->agentStatus(array('status' => 'On Break')));
+	}
+
+	// the state is only set once the status is saved
+	public function testDoesntSetTheStateWhenTheSaveFails(): void
+	{
+		$this->failSaves();
+
+		$this->assertSame(array('error' => 'error saving agent status', 'code' => 500), $this->agentStatus(array('status' => 'Available')));
+		$this->assertSame(array("api callcenter_config agent set status ".self::ANA." 'Available'"), $this->state()['esl_commands']);
 	}
 }
