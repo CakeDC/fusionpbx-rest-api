@@ -55,7 +55,7 @@ class CallCenterTest extends TestCase
 	public function testAnswersAgentNotLoadedForAnAgentMod_callcenterDoesntKnow(): void
 	{
 		$command = "api callcenter_config agent set status x 'On Break'";
-		$reply = array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent!');
+		$reply = array('error' => 'freeswitch rejected request', 'details' => '-ERR Agent not found!');
 
 		list($result, $logged) = self::errorLogged($command, $reply);
 
@@ -66,7 +66,9 @@ class CallCenterTest extends TestCase
 	public static function otherFailures(): array
 	{
 		return array(
-			'mod_callcenter refusing the command' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Status!')),
+			'mod_callcenter refusing the command' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent Status!')),
+			'mod_callcenter refusing the state' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent State!')),
+			'mod_callcenter refusing the key' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent Update KEY!')),
 			'another command not found' => array(array('error' => 'freeswitch rejected request', 'details' => '-ERR show Command not found!')),
 			'the text not at the start' => array(array('error' => 'freeswitch rejected request', 'details' => 'reply: -ERR callcenter_config Command not found!')),
 			'an empty reply' => array(array('error' => 'freeswitch rejected request', 'details' => '')),

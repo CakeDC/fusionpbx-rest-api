@@ -250,13 +250,13 @@ class CallCenterAgentStatusTest extends ActionTestCase
 	public function testAnswers500WhenFreeswitchRefusesTheStatus(): void
 	{
 		\FakeStore::update(function (&$state) {
-			$state['esl_response'] = "-ERR Invalid Status!\n";
+			$state['esl_response'] = "-ERR Invalid Agent Status!\n";
 		});
 
 		list($result, $logged) = $this->agentStatusLogged(array('status' => 'On Break'));
 
 		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
-		$this->assertStringContainsString('-ERR Invalid Status!', $logged);
+		$this->assertStringContainsString('-ERR Invalid Agent Status!', $logged);
 		$this->assertSame('Logged Out', $this->savedStatus());
 	}
 
@@ -264,7 +264,7 @@ class CallCenterAgentStatusTest extends ActionTestCase
 	public function testAnswersAgentNotLoadedWhenFreeswitchDoesntKnowTheAgent(): void
 	{
 		\FakeStore::update(function (&$state) {
-			$state['esl_response'] = "-ERR Invalid Agent!\n";
+			$state['esl_response'] = "-ERR Agent not found!\n";
 		});
 
 		$this->assertSame(array('error' => 'agent not loaded in mod_callcenter', 'code' => 500), $this->agentStatus(array('status' => 'On Break')));

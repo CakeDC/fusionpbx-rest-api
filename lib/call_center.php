@@ -5,7 +5,7 @@
 // the 500 of a failed callcenter_config command (an error array of parse_fs()
 // or fs_api_value()), logged with why. without mod_callcenter FreeSWITCH
 // answers "-ERR callcenter_config Command not found!" (mod_event_socket), and
-// mod_callcenter answers "-ERR Invalid Agent!" to "agent set" for an agent it
+// mod_callcenter answers "-ERR Agent not found!" to "agent set" for an agent it
 // hasn't loaded: both said apart, so neither is taken for a broken event socket
 function rest_api_call_center_error($command, $reply) {
     error_log("rest_api: ".$command." failed: ".json_encode($reply));
@@ -13,7 +13,7 @@ function rest_api_call_center_error($command, $reply) {
     if(strpos($details, "-ERR callcenter_config Command not found") === 0) {
         return array("error" => "mod_callcenter not loaded", "code" => 500);
     }
-    if(strpos($details, "-ERR Invalid Agent!") === 0) {
+    if(strpos($details, "-ERR Agent not found!") === 0) {
         return rest_api_call_center_agent_not_loaded();
     }
     return array("error" => "event socket error", "code" => 500);

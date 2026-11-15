@@ -80,9 +80,9 @@ class FsParserTest extends TestCase
 
 	public function testReportsARejectedSingleValue(): void
 	{
-		$this->respondWith("-ERR Invalid Agent!\n");
+		$this->respondWith("-ERR Agent not found!\n");
 
-		$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => '-ERR Invalid Agent!'), fs_api_value('api callcenter_config agent get status x'));
+		$this->assertSame(array('error' => 'freeswitch rejected request', 'details' => '-ERR Agent not found!'), fs_api_value('api callcenter_config agent get status x'));
 	}
 
 	// 5.6.5's event_socket_request() returns false when it can't connect

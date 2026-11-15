@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - `callcenter-queue-status`, `callcenter-agent-status` and `callcenter-agent-state` answer `500` `{"error": "mod_callcenter not loaded"}` instead of `event socket error` when FreeSWITCH runs without mod_callcenter (`-ERR callcenter_config Command not found!`), so a missing module can be told apart from an event socket that can't be reached. The log line of `callcenter-queue-status` now names the failed command.
-- `callcenter-agent-status` and `callcenter-agent-state` answer `500` `{"error": "agent not loaded in mod_callcenter"}` instead of `event socket error` for an agent that mod_callcenter hasn't loaded: missing from `callcenter_config agent list`, or `agent set` answering `-ERR Invalid Agent!`. Agents written to the database are only loaded by mod_callcenter on a save in FusionPBX's UI or a reload.
+- `callcenter-agent-status` and `callcenter-agent-state` answer `500` `{"error": "agent not loaded in mod_callcenter"}` instead of `event socket error` for an agent that mod_callcenter hasn't loaded: missing from `callcenter_config agent list`, or `agent set` answering `-ERR Agent not found!`. Agents written to the database are only loaded by mod_callcenter on a save in FusionPBX's UI or a reload.
 
 ### Fixed
 
