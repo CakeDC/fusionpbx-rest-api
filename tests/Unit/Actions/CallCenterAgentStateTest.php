@@ -122,13 +122,51 @@ class CallCenterAgentStateTest extends ActionTestCase
 	public function testAnswers500WhenFreeswitchRefusesTheState(): void
 	{
 		\FakeStore::update(function (&$state) {
-			$state['esl_response'] = "-ERR Invalid Agent!\n";
+			$state['esl_response'] = "-ERR Invalid Agent State!\n";
 		});
 
 		list($result, $logged) = $this->agentStateLogged('Waiting');
 
 		$this->assertSame(array('error' => 'event socket error', 'code' => 500), $result);
-		$this->assertStringContainsString('-ERR Invalid Agent!', $logged);
+		$this->assertStringContainsString('-ERR Invalid Agent State!', $logged);
+		$this->assertCount(1, $this->state()['esl_commands']);
+	}
+
+	// mod_callcenter answers "agent set" for an agent it hasn't loaded so
+	public function testAnswersAgentNotLoadedWhenFreeswitchDoesntKnowTheAgent(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_response'] = "-ERR Agent not found!\n";
+		});
+
+		list($result, $logged) = $this->agentStateLogged('Waiting');
+
+		$this->assertSame(array('error' => 'agent not loaded in mod_callcenter', 'code' => 500), $result);
+		$this->assertStringContainsString('-ERR Agent not found!', $logged);
+		$this->assertCount(1, $this->state()['esl_commands']);
+	}
+
+	// the state was set but the agent isn't listed
+	public function testAnswersAgentNotLoadedForAnAgentMissingInFreeswitch(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_responses'][self::LIST] = CallCenterAgentList::reply();
+		});
+
+		$this->assertSame(array('error' => 'agent not loaded in mod_callcenter', 'code' => 500), $this->agentState('Waiting'));
+	}
+
+	// what mod_event_socket answers when FreeSWITCH runs without mod_callcenter
+	public function testAnswers500WhenModCallcenterIsNotLoaded(): void
+	{
+		\FakeStore::update(function (&$state) {
+			$state['esl_response'] = "-ERR callcenter_config Command not found!\n";
+		});
+
+		list($result, $logged) = $this->agentStateLogged('Waiting');
+
+		$this->assertSame(array('error' => 'mod_callcenter not loaded', 'code' => 500), $result);
+		$this->assertStringContainsString('-ERR callcenter_config Command not found!', $logged);
 		$this->assertCount(1, $this->state()['esl_commands']);
 	}
 
