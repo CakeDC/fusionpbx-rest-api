@@ -130,6 +130,15 @@ function do_action($body) {
         return array("error" => "invalid own_number", "code" => 400);
     }
 
+    if(isset($body->call_center_queue_uuid)) {
+        $queues = rest_api_parse_list($body->call_center_queue_uuid);
+        if($queues === false || count(array_filter($queues, "is_uuid")) !== count($queues)) {
+            return array("error" => "invalid call_center_queue_uuid", "code" => 400);
+        }
+        // the domain_uuid condition keeps it to the domain's queues
+        $where[] = "c.call_center_queue_uuid IN (".implode(", ", array_map($bind, $queues)).")";
+    }
+
     if(isset($body->extension_uuid)) {
         $extensions = rest_api_parse_list($body->extension_uuid);
         if($extensions === false || count(array_filter($extensions, "is_uuid")) !== count($extensions)) {

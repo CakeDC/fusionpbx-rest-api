@@ -42,4 +42,31 @@ class FieldsTest extends TestCase
 
 		$this->assertEqualsCanonicalizing(array_keys(self::fieldLists()), array_values($lists));
 	}
+
+	public static function queueValues(): array
+	{
+		return array(
+			'epoch as Postgres returns a numeric' => array('cc_queue_joined_epoch', '1788858000', 1788858000),
+			'epoch as an integer' => array('cc_queue_answered_epoch', 1788858012, 1788858012),
+			'epoch with decimals' => array('cc_queue_canceled_epoch', '1788861640.000', 1788861640),
+			'empty epoch' => array('cc_queue_joined_epoch', '', null),
+			'unset epoch' => array('cc_queue_answered_epoch', '_undef_', null),
+			'zero epoch' => array('cc_queue_canceled_epoch', '0', null),
+			'null epoch' => array('cc_queue_canceled_epoch', null, null),
+			'side' => array('cc_side', 'member', 'member'),
+			'empty side' => array('cc_side', '', null),
+			'unset cancel reason' => array('cc_cancel_reason', '_undef_', null),
+			'cancel reason' => array('cc_cancel_reason', 'NO_AGENT_TIMEOUT', 'NO_AGENT_TIMEOUT'),
+			'empty cause' => array('cc_cause', '', null),
+		);
+	}
+
+	#[DataProvider('queueValues')]
+	public function testFormatsTheQueueValuesOfACdr(string $column, $stored, $expected): void
+	{
+		$cdr = array_fill_keys(REST_API_CDR_FIELDS, null);
+		$cdr[$column] = $stored;
+
+		$this->assertSame($expected, rest_api_format_cdr($cdr)[$column]);
+	}
 }

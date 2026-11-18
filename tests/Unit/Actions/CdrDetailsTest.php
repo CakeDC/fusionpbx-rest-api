@@ -1,6 +1,7 @@
 <?php
 namespace RestApi\Test\Unit\Actions;
 
+use FakeStore;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use RestApi\Test\Support\ActionTestCase;
@@ -64,6 +65,36 @@ class CdrDetailsTest extends ActionTestCase
 		);
 		$this->assertSame(REST_API_CDR_FIELDS, array_keys($legs[0]));
 		$this->assertSame(487, $legs[2]['hangup_cause_q850']);
+	}
+
+	public function testEveryLegHasItsQueueValues(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_xml_cdr'] = array_merge($state['tables']['v_xml_cdr'], S::queueRows());
+		});
+
+		$result = $this->details(S::QB1);
+
+		$this->assertSame(S::QA1, $result['xml_cdr_uuid']);
+		$this->assertSame(
+			array(
+				array(S::QA1, S::QUEUE_SALES, 'member', 1788858000, 1788858012, null, null, 'answered'),
+				array(S::QB1, S::QUEUE_SALES, 'agent', null, null, null, null, null),
+			),
+			array_map(function ($leg) {
+				return array($leg['xml_cdr_uuid'], $leg['call_center_queue_uuid'], $leg['cc_side'], $leg['cc_queue_joined_epoch'], $leg['cc_queue_answered_epoch'], $leg['cc_queue_canceled_epoch'], $leg['cc_cancel_reason'], $leg['cc_cause']);
+			}, $result['legs'])
+		);
+	}
+
+	public function testACallThatWasNotInAQueueHasNoQueueValues(): void
+	{
+		$leg = $this->details(S::A3)['legs'][0];
+
+		$this->assertSame(
+			array(null, null, null, null, null, null, null, null),
+			array($leg['call_center_queue_uuid'], $leg['cc_queue'], $leg['cc_side'], $leg['cc_queue_joined_epoch'], $leg['cc_queue_answered_epoch'], $leg['cc_queue_canceled_epoch'], $leg['cc_cancel_reason'], $leg['cc_cause'])
+		);
 	}
 
 	public function testIgnoresLegsOfAnotherDomainThatClaimTheCall(): void
