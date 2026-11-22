@@ -364,7 +364,8 @@ function rest_api_format_cdr($cdr) {
     // stores some unset ones as FreeSWITCH's "_undef_" or empty; an epoch
     // (numeric, so text from Postgres) of 0 is unset too
     foreach(array("cc_queue_joined_epoch", "cc_queue_answered_epoch", "cc_queue_canceled_epoch") as $column) {
-        $cdr[$column] = is_numeric($cdr[$column]) && (int)$cdr[$column] > 0 ? (int)$cdr[$column] : null;
+        $epoch = $cdr[$column];
+        $cdr[$column] = is_numeric($epoch) && (int)$epoch > 0 ? (int)$epoch : null;
     }
     foreach(array("cc_side", "cc_cancel_reason", "cc_cause") as $column) {
         if($cdr[$column] === "" || $cdr[$column] === "_undef_") {

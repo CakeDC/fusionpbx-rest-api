@@ -182,6 +182,40 @@ class CdrSearchTest extends ActionTestCase
 		$this->assertSame(array(S::XQ1), $this->uuids(array('domain_uuid' => S::OTHER_DOMAIN_UUID, 'call_center_queue_uuid' => S::QUEUE_SALES)));
 	}
 
+	// With calls_only=true an a-leg with no cc_* values won't match the queue filter
+	// even when its b-leg was served by that queue (a call answered then transferred in).
+	// calls_only=false returns all legs, so the b-leg matches.
+	public function testQueueFilterWithCallsOnlyMissesCallTransferredIntoQueue(): void
+	{
+		FakeStore::update(function (&$state) {
+			$state['tables']['v_xml_cdr'] = array_merge($state['tables']['v_xml_cdr'], array(
+				S::leg(S::QA5, 'a', '2026-09-09 10:00:00+00', array(
+					'direction' => 'inbound',
+					'caller_id_number' => '+15559990001',
+					'destination_number' => '5000',
+					'bridge_uuid' => S::QB5,
+				)),
+				S::leg(S::QB5, 'b', '2026-09-09 10:00:03+00', array(
+					'direction' => 'inbound',
+					'caller_id_number' => '+15559990001',
+					'destination_number' => '1001',
+					'originating_leg_uuid' => S::QA5,
+					'call_center_queue_uuid' => S::QUEUE_SALES,
+					'cc_queue' => '6000@tenant1.example.com',
+					'cc_side' => 'member',
+					'cc_queue_joined_epoch' => '1788944403',
+					'cc_cause' => 'answered',
+				)),
+			));
+		});
+
+		$result = $this->search(array('call_center_queue_uuid' => S::QUEUE_SALES, 'start_date' => '2026-09-09'));
+		$this->assertSame(array(), array_column($result['data'], 'xml_cdr_uuid'));
+
+		$result = $this->search(array('call_center_queue_uuid' => S::QUEUE_SALES, 'calls_only' => false, 'start_date' => '2026-09-09'));
+		$this->assertSame(array(S::QB5), array_column($result['data'], 'xml_cdr_uuid'));
+	}
+
 	public function testQueueFilterPaginates(): void
 	{
 		$this->withQueueCalls();

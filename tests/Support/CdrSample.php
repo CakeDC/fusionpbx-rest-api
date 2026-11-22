@@ -65,6 +65,9 @@ final class CdrSample
 	public const QA4 = 'c0000014-0000-4000-8000-00000000000a';
 	public const XQ1 = 'c0000019-0000-4000-8000-00000000000a';
 
+	public const QA5 = 'c0000015-0000-4000-8000-00000000000a';
+	public const QB5 = 'c0000015-0000-4000-8000-0000000000b1';
+
 	public const QUEUE_SALES = 'dddddddd-0000-4000-8000-000000000001';
 	public const QUEUE_SUPPORT = 'dddddddd-0000-4000-8000-000000000002';
 
@@ -108,7 +111,7 @@ final class CdrSample
 		);
 	}
 
-	private static function leg(string $uuid, string $leg, string $start, array $columns): array
+	public static function leg(string $uuid, string $leg, string $start, array $columns): array
 	{
 		// as Postgres prints a timestamptz in UTC
 		$end = (new \DateTimeImmutable($start))->modify('+1 minute')->format('Y-m-d H:i:s').'+00';
