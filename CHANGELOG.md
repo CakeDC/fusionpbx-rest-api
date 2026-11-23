@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- `cdr-search` and `cdr-details` return mod_callcenter's queue values of each leg: `cc_side` (`member` or `agent`), `cc_queue_joined_epoch`, `cc_queue_answered_epoch`, `cc_queue_canceled_epoch` (integer seconds), `cc_cancel_reason` and `cc_cause`, so the time a caller waited in a queue can be worked out. They are `null` for a call that didn't go through a queue and for values FusionPBX stored empty or as `_undef_`.
+- `cdr-search` and `cdr-details` return mod_callcenter's queue values of each leg: `cc_side` (`member` or `agent`), `cc_queue_joined_epoch`, `cc_queue_answered_epoch`, `cc_queue_canceled_epoch` (integer seconds), `cc_cancel_reason` and `cc_cause`, so the time a caller waited in a queue can be worked out. They are `null` for a call that didn't go through a queue and for values FusionPBX stored empty, as `_undef_` or, for an epoch, as `0`.
 - `cdr-search` takes a `call_center_queue_uuid` filter (one or more queue uuids) to read the calls of a queue. A malformed uuid answers `400` `{"error": "invalid call_center_queue_uuid"}`.
 
 ### Changed

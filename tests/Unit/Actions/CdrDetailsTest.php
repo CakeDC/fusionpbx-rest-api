@@ -20,7 +20,7 @@ class CdrDetailsTest extends ActionTestCase
 		return parent::tables() + array('v_xml_cdr' => S::rows());
 	}
 
-	private function details($xml_cdr_uuid): array
+	protected function details($xml_cdr_uuid): array
 	{
 		return $this->runAction(array('domain_uuid' => self::DOMAIN_UUID, 'xml_cdr_uuid' => $xml_cdr_uuid));
 	}

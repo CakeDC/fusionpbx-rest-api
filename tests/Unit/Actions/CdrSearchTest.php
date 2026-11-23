@@ -20,7 +20,7 @@ class CdrSearchTest extends ActionTestCase
 		return parent::tables() + array('v_xml_cdr' => S::rows());
 	}
 
-	private function search(array $body = array()): array
+	protected function search(array $body = array()): array
 	{
 		return $this->runAction($body + array('domain_uuid' => self::DOMAIN_UUID));
 	}
@@ -30,7 +30,7 @@ class CdrSearchTest extends ActionTestCase
 		return array_column($this->search($body)['data'], 'xml_cdr_uuid');
 	}
 
-	private function withQueueCalls(): void
+	protected function withQueueCalls(): void
 	{
 		FakeStore::update(function (&$state) {
 			$state['tables']['v_xml_cdr'] = array_merge($state['tables']['v_xml_cdr'], S::queueRows());

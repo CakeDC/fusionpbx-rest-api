@@ -616,11 +616,11 @@ The call center fields come from FreeSWITCH's mod_callcenter, as FusionPBX store
 |-------|-------------|
 | `call_center_queue_uuid`, `cc_queue` | The queue, and its `<extension>@<domain>` |
 | `cc_side` | `member` on the caller's leg that waited in the queue, `agent` on the leg of the agent it was offered to |
-| `cc_queue_joined_epoch` | When the caller joined the queue (Unix time, seconds) |
+| `cc_queue_joined_epoch` | When the caller joined the queue (Unix time, seconds; an epoch FusionPBX stored as `0` is returned as `null`, like the two below) |
 | `cc_queue_answered_epoch` | When an agent answered |
 | `cc_queue_canceled_epoch` | When the caller left the queue without being answered |
-| `cc_cause` | How the caller left the queue: `answered` (bridged to an agent) or `cancel` (left before one answered). mod_callcenter may set other values not listed here |
-| `cc_cancel_reason` | Why a `cancel` happened: `BREAK_OUT` (the caller hung up or the queue was left by the dialplan), `TIMEOUT` (the queue's max wait time ran out), `NO_AGENT_TIMEOUT` (no agent was available for the queue's no-agent time), `EXIT_WITH_KEY` (the caller pressed the queue's exit key), `PROGRESS_TIMEOUT` or `NONE`. mod_callcenter may set other values not listed here |
+| `cc_cause` | How the caller left the queue: `answered` (bridged to an agent) or `cancel` (left before one answered). mod_callcenter sets no other value |
+| `cc_cancel_reason` | Why a `cancel` happened: `BREAK_OUT` (the caller hung up or the queue was left by the dialplan), `TIMEOUT` (the queue's max wait time ran out), `NO_AGENT_TIMEOUT` (no agent was available for the queue's no-agent time), `EXIT_WITH_KEY` (the caller pressed the queue's exit key) or `NONE`. mod_callcenter sets no other value |
 
 `cc_cause`, `cc_cancel_reason` and the epochs are set on the `member` leg; the time a caller waited is `cc_queue_answered_epoch` (or `cc_queue_canceled_epoch`) minus `cc_queue_joined_epoch`.
 
