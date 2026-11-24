@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-24
+
+Targets FusionPBX **5.6.5**. No Upgrade step beyond the usual ones is needed. Some error responses and `originate`'s handling of `destination_a` change: read [Upgrading from earlier versions](README.md#upgrading-from-earlier-versions) before updating.
+
 ### Added
 
 - `cdr-search` and `cdr-details` return mod_callcenter's queue values of each leg: `cc_side` (`member` or `agent`), `cc_queue_joined_epoch`, `cc_queue_answered_epoch`, `cc_queue_canceled_epoch` (integer seconds), `cc_cancel_reason` and `cc_cause`, so the time a caller waited in a queue can be worked out. They are `null` for a call that didn't go through a queue and for values FusionPBX stored empty, as `_undef_` or, for an epoch, as `0`.
@@ -108,7 +112,8 @@ First release. Targets FusionPBX **5.6.5**.
 - Responses only contain documented columns. `extension-create` returns the SIP password only to users with `extension_password`.
 - **Breaking** (from the AccelerateNetworks code): existing keys stop working until a superadmin binds each one to a user.
 
-[Unreleased]: https://github.com/CakeDC/fusionpbx-rest-api/compare/2.0.1...HEAD
+[Unreleased]: https://github.com/CakeDC/fusionpbx-rest-api/compare/2.1.0...HEAD
+[2.1.0]: https://github.com/CakeDC/fusionpbx-rest-api/compare/2.0.1...2.1.0
 [2.0.1]: https://github.com/CakeDC/fusionpbx-rest-api/compare/2.0.0...2.0.1
 [2.0.0]: https://github.com/CakeDC/fusionpbx-rest-api/compare/1.0.0...2.0.0
 [1.0.0]: https://github.com/CakeDC/fusionpbx-rest-api/releases/tag/1.0.0

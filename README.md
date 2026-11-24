@@ -6,16 +6,16 @@ Clone a release into FusionPBX's `app/` folder, into a folder called `rest_api`:
 
 ```
 cd /var/www/fusionpbx/app
-git clone --branch 2.0.1 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
+git clone --branch 2.1.0 https://github.com/CakeDC/fusionpbx-rest-api.git rest_api
 ```
 
 Then log into the FusionPBX web interface, select Advanced -> Upgrade, check Schema, App Defaults, Menu Defaults and Permission Defaults, press Execute. (Permission Defaults is what gives the superadmin group the `rest_api_key_*` permissions. App Defaults adds the index on `v_xml_cdr.originating_leg_uuid` that `cdr-search` and `cdr-details` need on PostgreSQL; on a large CDR table it can take a few minutes, without blocking new call records.)
 
-To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout <version>`, e.g. `2.0.1`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) and the [changelog](CHANGELOG.md) first.
+To update to another release, check out its tag (`git -C rest_api fetch --tags && git -C rest_api checkout <version>`, e.g. `2.1.0`) and run the same Upgrade steps. Read [Upgrading from earlier versions](#upgrading-from-earlier-versions) and the [changelog](CHANGELOG.md) first.
 
 # Compatibility
 
-Version 2.0.1 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases), and what changed in each one in the [changelog](CHANGELOG.md).
+Version 2.1.0 targets FusionPBX **5.6.5**. Releases are listed on the [releases page](https://github.com/CakeDC/fusionpbx-rest-api/releases), and what changed in each one in the [changelog](CHANGELOG.md).
 
 # Features
 
@@ -136,7 +136,7 @@ Other FusionPBX apps can expose actions through an `app_api.php` file (call them
 
 ## Upgrading from earlier versions
 
-From 2.0.1 to 2.0.2:
+From 2.0.1 to 2.1.0:
 - `callcenter-queue-status`, `callcenter-agent-status` and `callcenter-agent-state` answer `500 {"error": "mod_callcenter not loaded"}` instead of `500 {"error": "event socket error"}` when FreeSWITCH runs without mod_callcenter. A client that maps the error body should treat it as the call center being unavailable on the server; the fix is loading mod_callcenter in FreeSWITCH.
 - `callcenter-agent-status` and `callcenter-agent-state` answer `500 {"error": "agent not loaded in mod_callcenter"}` instead of `500 {"error": "event socket error"}` for an agent that is in the database but not in mod_callcenter. The fix is saving the agent in FusionPBX's UI or reloading mod_callcenter.
 - `callcenter-agent-status` saves a status FreeSWITCH took even when the `agent set state ... 'Waiting'` that follows fails (it still answers `500`).
