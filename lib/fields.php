@@ -340,7 +340,13 @@ const REST_API_CDR_FIELDS = array(
     "record_name",
     "record_path",
     "call_center_queue_uuid",
-    "cc_queue"
+    "cc_queue",
+    "cc_side",
+    "cc_queue_joined_epoch",
+    "cc_queue_answered_epoch",
+    "cc_queue_canceled_epoch",
+    "cc_cancel_reason",
+    "cc_cause"
 );
 
 // the database may return numbers as text and booleans as "t"/"f". record_name
@@ -351,6 +357,18 @@ function rest_api_format_cdr($cdr) {
     $cdr['missed_call'] = in_array($cdr['missed_call'], array(true, 1, "1", "t", "true"), true);
     foreach(array("record_name", "record_path") as $column) {
         if($cdr[$column] === "") {
+            $cdr[$column] = null;
+        }
+    }
+    // mod_callcenter's values, null on a call that wasn't in a queue. FusionPBX
+    // stores some unset ones as FreeSWITCH's "_undef_" or empty; an epoch
+    // (numeric, so text from Postgres) of 0 is unset too
+    foreach(array("cc_queue_joined_epoch", "cc_queue_answered_epoch", "cc_queue_canceled_epoch") as $column) {
+        $epoch = $cdr[$column];
+        $cdr[$column] = is_numeric($epoch) && (int)$epoch > 0 ? (int)$epoch : null;
+    }
+    foreach(array("cc_side", "cc_cancel_reason", "cc_cause") as $column) {
+        if($cdr[$column] === "" || $cdr[$column] === "_undef_") {
             $cdr[$column] = null;
         }
     }

@@ -559,6 +559,7 @@ Live counts of a call center queue, read from FreeSWITCH's mod_callcenter throug
 | `start_date`     | no | Calls that started at or after this ISO 8601 date-time (UTC without an offset). A date alone (`2026-09-01`) means 00:00 UTC of that day |
 | `end_date`       | no | Calls that started at or before this date-time. A date alone includes the whole day (UTC). Not before `start_date` |
 | `direction`      | no | `inbound`, `outbound` or `local` |
+| `call_center_queue_uuid` | no | Comma-separated string or array of up to 100 call center queue uuids. Calls that went through one of these queues (the `call_center_queue_uuid` of the row). `v_xml_cdr` has no index on this column; combine with `start_date`/`end_date` on large CDR tables to avoid a full domain scan. With `calls_only=true` (the default), a call that was answered first and then transferred into a queue is shown by its `a` leg, which has no `cc_*` values and won't match this filter; use `calls_only=false` to match all legs |
 | `extension_uuid` | no | Comma-separated string or array of up to 100 extension uuids. Calls where any leg belongs to one of them, so the extension that received a call sees it as well as the one that made it. Each call is returned once |
 | `counterparty`   | no | Text (up to 64 characters) the caller or destination number contains. `%` and `_` are plain characters |
 | `own_number`     | no | Comma-separated string or array of up to 100 of the viewer's own numbers. With `counterparty`, only the other party is searched: the destination when the caller is one of them, else the caller when the destination is one of them, else both |
@@ -594,14 +595,36 @@ FusionPBX writes one record per call leg and doesn't give the legs of a call a s
       "record_name": "c1.wav",
       "record_path": "/var/lib/freeswitch/recordings/tenant1.example.com/archive/2026/Sep/01",
       "call_center_queue_uuid": null,
-      "cc_queue": null
+      "cc_queue": null,
+      "cc_side": null,
+      "cc_queue_joined_epoch": null,
+      "cc_queue_answered_epoch": null,
+      "cc_queue_canceled_epoch": null,
+      "cc_cancel_reason": null,
+      "cc_cause": null
     }
   ],
   "pagination": {"page": 1, "per_page": 25, "total": 1}
 }
 ```
 
-`record_name` and `record_path` (the recording's directory on the PBX) are `null` for calls that weren't recorded. A page past the last returns `"data": []` with the correct `total`. An invalid parameter returns `400 {"error": "invalid <parameter>"}`.
+`record_name` and `record_path` (the recording's directory on the PBX) are `null` for calls that weren't recorded.
+
+The call center fields come from FreeSWITCH's mod_callcenter, as FusionPBX stores them. They are `null` for a call that didn't go through a queue, and for any value FusionPBX stored empty (or as FreeSWITCH's unset `_undef_`):
+
+| Field | Description |
+|-------|-------------|
+| `call_center_queue_uuid`, `cc_queue` | The queue, and its `<extension>@<domain>` |
+| `cc_side` | `member` on the caller's leg that waited in the queue, `agent` on the leg of the agent it was offered to |
+| `cc_queue_joined_epoch` | When the caller joined the queue (Unix time, seconds; an epoch FusionPBX stored as `0` is returned as `null`, like the two below) |
+| `cc_queue_answered_epoch` | When an agent answered |
+| `cc_queue_canceled_epoch` | When the caller left the queue without being answered |
+| `cc_cause` | How the caller left the queue: `answered` (bridged to an agent) or `cancel` (left before one answered). mod_callcenter sets no other value |
+| `cc_cancel_reason` | Why a `cancel` happened: `BREAK_OUT` (the caller hung up or the queue was left by the dialplan), `TIMEOUT` (the queue's max wait time ran out), `NO_AGENT_TIMEOUT` (no agent was available for the queue's no-agent time), `EXIT_WITH_KEY` (the caller pressed the queue's exit key) or `NONE`. mod_callcenter sets no other value |
+
+`cc_cause`, `cc_cancel_reason` and the epochs are set on the `member` leg; the time a caller waited is `cc_queue_answered_epoch` (or `cc_queue_canceled_epoch`) minus `cc_queue_joined_epoch`.
+
+A page past the last returns `"data": []` with the correct `total`. An invalid parameter returns `400 {"error": "invalid <parameter>"}`.
 
 ## `cdr-details`
 | Parameter      | Required | Description |
